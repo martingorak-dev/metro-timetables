@@ -1,4 +1,4 @@
-name: Parse Metro Timetables v2
+name: Parse Metro Timetables (new)
 
 on:
   push:
