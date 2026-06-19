@@ -16,32 +16,8 @@ Future<void> main() async {
   final stationRegex = RegExp(r'^[A-Za-zÁČĎÉĚÍŇÓŘŠŤÚŮÝŽáčďéěíňóřšťúůýž ]{3,}');
   final timeRegex = RegExp(r'\b\d{1,2}:\d{2}\b');
 
-  // První stanice pro detekci dne
   const firstForwardStation = "DEPO HOSTIVAŘ";
   const firstBackwardStation = "NEMOCNICE MOTOL";
-
-  // Seznam stanic – směr ZPĚT
-  final backwardStations = [
-    "NEMOCNICE MOTOL",
-    "Petřiny",
-    "Nádraží Veleslavín",
-    "Bořislavka",
-    "Dejvická",
-    "Hradčanská",
-    "Malostranská",
-    "Staroměstská",
-    "Můstek - A",
-    "Muzeum - A",
-    "Náměstí Míru",
-    "Jiřího z Poděbrad",
-    "Želivského",
-    "Strašnická",
-    "Skalka",
-    "DEPO HOSTIVAŘ"
-  ];
-
-  // Směr TAM = obrácený seznam
-  final forwardStations = backwardStations.reversed.toList();
 
   final Map<String, dynamic> output = {
     "line": "A",
@@ -72,34 +48,30 @@ Future<void> main() async {
     final times = timeRegex.allMatches(line).map((m) => m.group(0)!).toList();
     if (times.isEmpty) continue;
 
-    // 1) Detekce směru podle seznamu stanic
-    if (forwardStations.contains(stationName)) {
+    // Určení směru + přepínání dne
+    if (stationName == firstForwardStation &&
+        // nesmíme přepnout na forward, pokud jsme u DEPA v rámci směru ZPĚT
+        currentDirection != "backward") {
+      if (hasForwardData &&
+          times.first.startsWith("4:") &&
+          dayIndexForward < 2) {
+        dayIndexForward++;
+      }
       currentDirection = "forward";
       hasForwardData = true;
-    } else if (backwardStations.contains(stationName)) {
+    } else if (stationName == firstBackwardStation &&
+        // nesmíme přepnout na backward, pokud jsme u NEMOCNICE v rámci směru TAM
+        currentDirection != "forward") {
+      if (hasBackwardData &&
+          times.first.startsWith("4:") &&
+          dayIndexBackward < 2) {
+        dayIndexBackward++;
+      }
       currentDirection = "backward";
       hasBackwardData = true;
-    } else {
-      // Stanice není v seznamu → ignorovat
-      continue;
     }
 
-    // 2) Detekce přepnutí dne podle první stanice směru + 4:xx
-    if (currentDirection == "forward" &&
-        stationName == firstForwardStation &&
-        hasForwardData &&
-        times.first.startsWith("4:") &&
-        dayIndexForward < 2) {
-      dayIndexForward++;
-    }
-
-    if (currentDirection == "backward" &&
-        stationName == firstBackwardStation &&
-        hasBackwardData &&
-        times.first.startsWith("4:") &&
-        dayIndexBackward < 2) {
-      dayIndexBackward++;
-    }
+    if (currentDirection == null) continue;
 
     final directions = output["directions"] as Map<String, dynamic>;
     final directionMap =
