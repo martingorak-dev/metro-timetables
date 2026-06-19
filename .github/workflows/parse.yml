@@ -20,9 +20,12 @@ jobs:
 
       - name: Convert PDF to text (layout preserved)
         run: |
+          echo "PDF files in repo:"
+          ls -l pdf
           mkdir -p ocr
           rm -f ocr/output.txt
           for f in pdf/*.pdf; do
+            echo "Processing $f"
             pdftotext -layout "$f" "ocr/output.txt"
           done
 
