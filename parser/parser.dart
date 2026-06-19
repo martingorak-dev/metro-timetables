@@ -16,7 +16,11 @@ Future<void> main() async {
   final stationRegex = RegExp(r'^[A-Za-zÁČĎÉĚÍŇÓŘŠŤÚŮÝŽáčďéěíňóřšťúůýž ]{3,}');
   final timeRegex = RegExp(r'\b\d{1,2}:\d{2}\b');
 
-  // Seznam stanic – směr ZPĚT (A → B → C)
+  // První stanice pro detekci dne
+  const firstForwardStation = "DEPO HOSTIVAŘ";
+  const firstBackwardStation = "NEMOCNICE MOTOL";
+
+  // Seznam stanic – směr ZPĚT
   final backwardStations = [
     "NEMOCNICE MOTOL",
     "Petřiny",
@@ -68,29 +72,33 @@ Future<void> main() async {
     final times = timeRegex.allMatches(line).map((m) => m.group(0)!).toList();
     if (times.isEmpty) continue;
 
-    // 🔥 Robustní detekce směru podle seznamu stanic
+    // 1) Detekce směru podle seznamu stanic
     if (forwardStations.contains(stationName)) {
-      // Pokud jsme byli v backward a vidíme forward → přepnout
-      if (currentDirection == "backward") {
-        // nový den začíná jen pokud první čas je 4:xx
-        if (times.first.startsWith("4:") && dayIndexForward < 2) {
-          dayIndexForward++;
-        }
-      }
       currentDirection = "forward";
       hasForwardData = true;
     } else if (backwardStations.contains(stationName)) {
-      // Pokud jsme byli v forward a vidíme backward → přepnout
-      if (currentDirection == "forward") {
-        if (times.first.startsWith("4:") && dayIndexBackward < 2) {
-          dayIndexBackward++;
-        }
-      }
       currentDirection = "backward";
       hasBackwardData = true;
     } else {
       // Stanice není v seznamu → ignorovat
       continue;
+    }
+
+    // 2) Detekce přepnutí dne podle první stanice směru + 4:xx
+    if (currentDirection == "forward" &&
+        stationName == firstForwardStation &&
+        hasForwardData &&
+        times.first.startsWith("4:") &&
+        dayIndexForward < 2) {
+      dayIndexForward++;
+    }
+
+    if (currentDirection == "backward" &&
+        stationName == firstBackwardStation &&
+        hasBackwardData &&
+        times.first.startsWith("4:") &&
+        dayIndexBackward < 2) {
+      dayIndexBackward++;
     }
 
     final directions = output["directions"] as Map<String, dynamic>;
