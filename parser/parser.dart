@@ -16,8 +16,28 @@ Future<void> main() async {
   final stationRegex = RegExp(r'^[A-Za-zÁČĎÉĚÍŇÓŘŠŤÚŮÝŽáčďéěíňóřšťúůýž ]{3,}');
   final timeRegex = RegExp(r'\b\d{1,2}:\d{2}\b');
 
-  const firstForwardStation = "DEPO HOSTIVAŘ";
-  const firstBackwardStation = "NEMOCNICE MOTOL";
+  // Seznam stanic – směr ZPĚT (A → B → C)
+  final backwardStations = [
+    "NEMOCNICE MOTOL",
+    "Petřiny",
+    "Nádraží Veleslavín",
+    "Bořislavka",
+    "Dejvická",
+    "Hradčanská",
+    "Malostranská",
+    "Staroměstská",
+    "Můstek - A",
+    "Muzeum - A",
+    "Náměstí Míru",
+    "Jiřího z Poděbrad",
+    "Želivského",
+    "Strašnická",
+    "Skalka",
+    "DEPO HOSTIVAŘ"
+  ];
+
+  // Směr TAM = obrácený seznam
+  final forwardStations = backwardStations.reversed.toList();
 
   final Map<String, dynamic> output = {
     "line": "A",
@@ -48,22 +68,30 @@ Future<void> main() async {
     final times = timeRegex.allMatches(line).map((m) => m.group(0)!).toList();
     if (times.isEmpty) continue;
 
-    // Určení směru + přepínání dne
-    if (stationName == firstForwardStation) {
-      if (hasForwardData && times.first.startsWith("4:") && dayIndexForward < 2) {
-        dayIndexForward++;
+    // 🔥 Robustní detekce směru podle seznamu stanic
+    if (forwardStations.contains(stationName)) {
+      // Pokud jsme byli v backward a vidíme forward → přepnout
+      if (currentDirection == "backward") {
+        // nový den začíná jen pokud první čas je 4:xx
+        if (times.first.startsWith("4:") && dayIndexForward < 2) {
+          dayIndexForward++;
+        }
       }
       currentDirection = "forward";
       hasForwardData = true;
-    } else if (stationName == firstBackwardStation) {
-      if (hasBackwardData && times.first.startsWith("4:") && dayIndexBackward < 2) {
-        dayIndexBackward++;
+    } else if (backwardStations.contains(stationName)) {
+      // Pokud jsme byli v forward a vidíme backward → přepnout
+      if (currentDirection == "forward") {
+        if (times.first.startsWith("4:") && dayIndexBackward < 2) {
+          dayIndexBackward++;
+        }
       }
       currentDirection = "backward";
       hasBackwardData = true;
+    } else {
+      // Stanice není v seznamu → ignorovat
+      continue;
     }
-
-    if (currentDirection == null) continue;
 
     final directions = output["directions"] as Map<String, dynamic>;
     final directionMap =
