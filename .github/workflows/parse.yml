@@ -13,28 +13,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Install dependencies
-        run: sudo apt-get update
+      - name: Install Poppler (pdftotext)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y poppler-utils
 
-      - name: Install Tesseract OCR
-        run: sudo apt-get install -y tesseract-ocr
-
-      - name: Install PDF to PNG converter
-        run: sudo apt-get install -y poppler-utils
-
-      - name: Convert PDF to PNG
+      - name: Convert PDF to text (layout preserved)
         run: |
           mkdir -p ocr
-          for f in pdf/*.pdf; do
-            pdftoppm "$f" ocr/page -png
-          done
-
-      - name: Run OCR on all PNG pages
-        run: |
           rm -f ocr/output.txt
-          for img in ocr/page-*.png; do
-            tesseract "$img" stdout >> ocr/output.txt
-            echo "" >> ocr/output.txt
+          for f in pdf/*.pdf; do
+            pdftotext -layout "$f" "ocr/output.txt"
           done
 
       - name: Install Dart SDK
