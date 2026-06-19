@@ -2,60 +2,50 @@ import 'dart:io';
 import 'dart:convert';
 
 Future<void> main() async {
-  print("MetroBuddy OCR parser starting...");
+  print("MetroBuddy PDF parser starting...");
 
   final input = File('../ocr/output.txt');
   if (!input.existsSync()) {
-    print("OCR output not found: ${input.path}");
+    print("Text output not found: ${input.path}");
     return;
   }
 
   final text = await input.readAsString();
-  final lines = text.split('\n').map((l) => l.trim()).toList();
+  final lines = text.split('\n');
 
-  final stationNames = <String>[];
-  final directions = <String>[];
-  final times = <String>[];
+  final stationRegex = RegExp(r'^[A-Za-zÁČĎÉĚÍŇÓŘŠŤÚŮÝŽáčďéěíňóřšťúůýž ]{3,}');
+  final timeRegex = RegExp(r'\b\d{1,2}:\d{2}\b');
 
-  final timeRegex = RegExp(r'\b\d{1,2}[:.]\d{2}\b');
+  final List<Map<String, dynamic>> stations = [];
 
-  for (final line in lines) {
+  for (final rawLine in lines) {
+    final line = rawLine.trim();
     if (line.isEmpty) continue;
 
-    // Stanice – většinou velká písmena
-    if (RegExp(r'^[A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ ]+$').hasMatch(line) &&
-        line.length > 3 &&
-        !line.contains("SMĚR")) {
-      stationNames.add(line);
-      continue;
-    }
+    // Najdeme název stanice (je vždy na začátku řádku)
+    final match = stationRegex.matchAsPrefix(line);
+    if (match == null) continue;
 
-    // Směr
-    if (line.toUpperCase().contains("SMĚR")) {
-      directions.add(line);
-      continue;
-    }
+    final stationName = match.group(0)!.trim();
 
-    // Časy
-    final matches = timeRegex.allMatches(line);
-    for (final m in matches) {
-      var t = m.group(0)!;
-      t = t.replaceAll('.', ':'); // OCR někdy dává tečku
-      if (t.length == 4) {
-        t = "0$t"; // 432 → 04:32
-      }
-      times.add(t);
-    }
+    // Extrahujeme časy
+    final times = timeRegex.allMatches(line).map((m) => m.group(0)!).toList();
+
+    if (times.isEmpty) continue;
+
+    stations.add({
+      "station": stationName,
+      "times": times,
+    });
   }
 
   final output = {
-    "stations": stationNames,
-    "directions": directions,
-    "times": times,
+    "line": "A",
+    "stations": stations,
   };
 
-  final outFile = File('../json/output.json');
+  final outFile = File('../json/A.json');
   outFile.writeAsStringSync(JsonEncoder.withIndent('  ').convert(output));
 
-  print("JSON saved to json/output.json");
+  print("JSON saved to json/A.json");
 }
