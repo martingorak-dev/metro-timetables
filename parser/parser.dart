@@ -19,7 +19,6 @@ Future<void> main() async {
   const firstForwardStation = "DEPO HOSTIVAŘ";
   const firstBackwardStation = "NEMOCNICE MOTOL";
 
-  // Výstupní struktura
   final Map<String, dynamic> output = {
     "line": "A",
     "directions": {
@@ -28,7 +27,6 @@ Future<void> main() async {
     }
   };
 
-  // Stav
   String? currentDirection; // "forward" / "backward"
   int dayIndexForward = 0;  // 0=weekday, 1=saturday, 2=sunday
   int dayIndexBackward = 0;
@@ -50,15 +48,15 @@ Future<void> main() async {
     final times = timeRegex.allMatches(line).map((m) => m.group(0)!).toList();
     if (times.isEmpty) continue;
 
-    // Určení směru
+    // Určení směru + přepínání dne
     if (stationName == firstForwardStation) {
-      if (hasForwardData && times.first.startsWith("4:")) {
+      if (hasForwardData && times.first.startsWith("4:") && dayIndexForward < 2) {
         dayIndexForward++;
       }
       currentDirection = "forward";
       hasForwardData = true;
     } else if (stationName == firstBackwardStation) {
-      if (hasBackwardData && times.first.startsWith("4:")) {
+      if (hasBackwardData && times.first.startsWith("4:") && dayIndexBackward < 2) {
         dayIndexBackward++;
       }
       currentDirection = "backward";
@@ -67,7 +65,6 @@ Future<void> main() async {
 
     if (currentDirection == null) continue;
 
-    // Přístup k directions mapě
     final directions = output["directions"] as Map<String, dynamic>;
     final directionMap =
     directions[currentDirection] as Map<String, Map<String, List<String>>>;
@@ -76,18 +73,15 @@ Future<void> main() async {
         ? dayName(dayIndexForward)
         : dayName(dayIndexBackward);
 
-    // Pokud stanice ještě není → vytvoříme
     directionMap.putIfAbsent(stationName, () => {
       "weekday": <String>[],
       "saturday": <String>[],
       "sunday": <String>[],
     });
 
-    // Přidáme časy do správného dne
     directionMap[stationName]![day]!.addAll(times);
   }
 
-  // Převod do finálního JSON formátu
   final directions = output["directions"] as Map<String, dynamic>;
   final forwardMap =
   directions["forward"] as Map<String, Map<String, List<String>>>;
