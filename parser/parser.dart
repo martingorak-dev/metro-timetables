@@ -16,36 +16,112 @@ Future<void> main() async {
   final stationRegex = RegExp(r'^[A-Za-zÁČĎÉĚÍŇÓŘŠŤÚŮÝŽáčďéěíňóřšťúůýž ]{3,}');
   final timeRegex = RegExp(r'\b\d{1,2}:\d{2}\b');
 
-  final List<Map<String, dynamic>> stations = [];
+  const firstForwardStation = "DEPO HOSTIVAŘ";
+  const firstBackwardStation = "NEMOCNICE MOTOL";
+
+  // Výstupní struktura
+  final Map<String, dynamic> output = {
+    "line": "A",
+    "directions": {
+      "forward": <String, Map<String, List<String>>>{},
+      "backward": <String, Map<String, List<String>>>{},
+    }
+  };
+
+  // Stav
+  String? currentDirection; // "forward" / "backward"
+  int dayIndexForward = 0;  // 0=weekday, 1=saturday, 2=sunday
+  int dayIndexBackward = 0;
+
+  String dayName(int index) =>
+      index == 0 ? "weekday" : index == 1 ? "saturday" : "sunday";
+
+  bool hasForwardData = false;
+  bool hasBackwardData = false;
 
   for (final rawLine in lines) {
     final line = rawLine.trim();
     if (line.isEmpty) continue;
 
-    // Najdeme název stanice (je vždy na začátku řádku)
     final match = stationRegex.matchAsPrefix(line);
     if (match == null) continue;
 
     final stationName = match.group(0)!.trim();
-
-    // Extrahujeme časy
     final times = timeRegex.allMatches(line).map((m) => m.group(0)!).toList();
-
     if (times.isEmpty) continue;
 
-    stations.add({
-      "station": stationName,
-      "times": times,
+    // Určení směru
+    if (stationName == firstForwardStation) {
+      if (hasForwardData && times.first.startsWith("4:")) {
+        dayIndexForward++;
+      }
+      currentDirection = "forward";
+      hasForwardData = true;
+    } else if (stationName == firstBackwardStation) {
+      if (hasBackwardData && times.first.startsWith("4:")) {
+        dayIndexBackward++;
+      }
+      currentDirection = "backward";
+      hasBackwardData = true;
+    }
+
+    if (currentDirection == null) continue;
+
+    // Přístup k directions mapě
+    final directions = output["directions"] as Map<String, dynamic>;
+    final directionMap =
+    directions[currentDirection] as Map<String, Map<String, List<String>>>;
+
+    final day = currentDirection == "forward"
+        ? dayName(dayIndexForward)
+        : dayName(dayIndexBackward);
+
+    // Pokud stanice ještě není → vytvoříme
+    directionMap.putIfAbsent(stationName, () => {
+      "weekday": <String>[],
+      "saturday": <String>[],
+      "sunday": <String>[],
     });
+
+    // Přidáme časy do správného dne
+    directionMap[stationName]![day]!.addAll(times);
   }
 
-  final output = {
+  // Převod do finálního JSON formátu
+  final directions = output["directions"] as Map<String, dynamic>;
+  final forwardMap =
+  directions["forward"] as Map<String, Map<String, List<String>>>;
+  final backwardMap =
+  directions["backward"] as Map<String, Map<String, List<String>>>;
+
+  final forwardList = forwardMap.entries
+      .map((e) => {
+    "station": e.key,
+    "weekday": e.value["weekday"],
+    "saturday": e.value["saturday"],
+    "sunday": e.value["sunday"],
+  })
+      .toList();
+
+  final backwardList = backwardMap.entries
+      .map((e) => {
+    "station": e.key,
+    "weekday": e.value["weekday"],
+    "saturday": e.value["saturday"],
+    "sunday": e.value["sunday"],
+  })
+      .toList();
+
+  final finalOutput = {
     "line": "A",
-    "stations": stations,
+    "directions": {
+      "forward": forwardList,
+      "backward": backwardList,
+    }
   };
 
   final outFile = File('json/A.json');
-  outFile.writeAsStringSync(JsonEncoder.withIndent('  ').convert(output));
+  outFile.writeAsStringSync(JsonEncoder.withIndent('  ').convert(finalOutput));
 
   print("JSON saved to json/A.json");
 }
