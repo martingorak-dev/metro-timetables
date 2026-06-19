@@ -29,10 +29,16 @@ Thumbs.db
 *.tmp
 *.temp
 
-# Parser folders (keep only .gitkeep)
+# Parser folders (ignore everything except .gitkeep and real data files)
 pdf/*
-json/*
-parser/*
+!pdf/*.pdf
 !pdf/.gitkeep
+
+json/*
+!json/*.json
 !json/.gitkeep
+
+parser/*
+!parser/*.dart
 !parser/.gitkeep
+
