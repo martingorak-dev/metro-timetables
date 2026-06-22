@@ -51,6 +51,8 @@ Future<void> main() async {
     "NEMOCNICE MOTOL"
   ];
 
+  final normalizedStations = stations.map(normalize).toList();
+
   final result = {
     "line": "A",
     "stations": <String, dynamic>{}
@@ -62,8 +64,9 @@ Future<void> main() async {
       t.startsWith("3:") || t.startsWith("4:") || t.startsWith("5:");
 
   // PRO KAŽDOU STANICI ZVLÁŠŤ
-  for (final station in stations) {
-    final normalizedStation = normalize(station);
+  for (int s = 0; s < stations.length; s++) {
+    final station = stations[s];
+    final normalizedStation = normalizedStations[s];
 
     final stationBlock = {
       "forward": {
@@ -85,18 +88,58 @@ Future<void> main() async {
     String direction = "forward";
     int dayIndex = 0;
 
-    for (int i = 0; i < normalizedLines.length; i++) {
-      final line = normalizedLines[i];
+    int i = 0;
+    while (i < normalizedLines.length) {
+      final normLine = normalizedLines[i];
 
-      // OCR‑odolné hledání stanice
-      if (!line.contains(normalizedStation)) continue;
+      // řádek nepatří této stanici → dál
+      if (!normLine.contains(normalizedStation)) {
+        i++;
+        continue;
+      }
 
-      final times = timeRegex.allMatches(lines[i]).map((m) => m.group(0)!).toList();
-      if (times.isEmpty) continue;
+      // 1) sebereme časy z řádku se stanicí
+      List<String> times = timeRegex
+          .allMatches(lines[i])
+          .map((m) => m.group(0)!)
+          .toList();
+
+      // 2) podíváme se na následující řádky, jestli patří ke stejné „řádce tabulky“
+      int j = i + 1;
+      while (j < normalizedLines.length) {
+        final nextNorm = normalizedLines[j];
+
+        // pokud další řádek obsahuje nějakou jinou stanici → konec bloku
+        bool containsOtherStation = false;
+        for (final ns in normalizedStations) {
+          if (nextNorm.contains(ns)) {
+            containsOtherStation = true;
+            break;
+          }
+        }
+        if (containsOtherStation) break;
+
+        // jinak zkusíme z něj vytáhnout časy (např. řádek s "int. 10  23:38 23:48...")
+        final extraTimes = timeRegex
+            .allMatches(lines[j])
+            .map((m) => m.group(0)!)
+            .toList();
+
+        if (extraTimes.isNotEmpty) {
+          times.addAll(extraTimes);
+        }
+
+        j++;
+      }
+
+      if (times.isEmpty) {
+        i = j;
+        continue;
+      }
 
       final first = times.first;
 
-      // přesně tvoje DH logika
+      // DH logika – nový den podle 3/4/5:xx
       if (isDayStart(first)) {
         dayStartCount++;
 
@@ -119,6 +162,9 @@ Future<void> main() async {
         if (dayIndex == 1) backward["saturday"]!.addAll(times);
         if (dayIndex == 2) backward["sunday"]!.addAll(times);
       }
+
+      // přeskočíme všechny řádky, které jsme k této stanici už přibrali
+      i = j;
     }
 
     stationsMap[station] = stationBlock;
