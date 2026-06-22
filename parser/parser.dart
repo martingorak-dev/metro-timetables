@@ -14,7 +14,6 @@ Future<void> main() async {
   final lines = text.split('\n');
 
   final timeRegex = RegExp(r'\b\d{1,2}:\d{2}\b');
-
   const station = "DEPO HOSTIVAŘ";
 
   final Map<String, dynamic> result = {
@@ -38,12 +37,11 @@ Future<void> main() async {
   final backward =
   (result["directions"] as Map<String, dynamic>)["backward"] as Map<String, List<String>>;
 
-  int depoCount = 0; // kolikrát jsme narazili na DEPO
-  int dayIndexForward = 0;
+  String direction = "forward";        // začínáme TAM
+  int forwardFourCount = 0;           // kolikrát jsme viděli DH s 4:xx v TAM
+  int backwardFourCount = 0;          // kolikrát jsme viděli DH s 4:xx v ZPĚT
+  int dayIndexForward = 0;            // 0=weekday,1=saturday,2=sunday
   int dayIndexBackward = 0;
-
-  bool hasForwardTimes = false;
-  bool hasBackwardTimes = false;
 
   for (final rawLine in lines) {
     final line = rawLine.trim();
@@ -52,32 +50,48 @@ Future<void> main() async {
     final times = timeRegex.allMatches(line).map((m) => m.group(0)!).toList();
     if (times.isEmpty) continue;
 
-    depoCount++;
+    final first = times.first;
 
-    // určení směru podle pořadí výskytů
-    bool isForward = depoCount <= 3;
-    bool isBackward = depoCount > 3;
-
-    // přepnutí dne – jen v rámci stejného směru
-    if (times.first.startsWith("4:")) {
-      if (isForward && hasForwardTimes && dayIndexForward < 2) {
-        dayIndexForward++;
-      }
-      if (isBackward && hasBackwardTimes && dayIndexBackward < 2) {
-        dayIndexBackward++;
-      }
+    // přepnutí směru: po dokončení TAM (3× 4:xx) a dalším DH bez 4:xx začíná ZPĚT
+    if (direction == "forward" &&
+        forwardFourCount == 3 &&
+        !first.startsWith("4:")) {
+      direction = "backward";
+      dayIndexBackward = 0;
     }
 
-    if (isForward) {
-      if (dayIndexForward == 0) forward["weekday"]!.addAll(times);
-      if (dayIndexForward == 1) forward["saturday"]!.addAll(times);
-      if (dayIndexForward == 2) forward["sunday"]!.addAll(times);
-      hasForwardTimes = true;
+    if (direction == "forward") {
+      // počítáme DH řádky s 4:xx v TAM
+      if (first.startsWith("4:")) {
+        forwardFourCount++;
+        if (forwardFourCount == 1) dayIndexForward = 0; // weekday
+        if (forwardFourCount == 2) dayIndexForward = 1; // saturday
+        if (forwardFourCount == 3) dayIndexForward = 2; // sunday
+      }
+
+      if (dayIndexForward == 0) {
+        forward["weekday"]!.addAll(times);
+      } else if (dayIndexForward == 1) {
+        forward["saturday"]!.addAll(times);
+      } else {
+        forward["sunday"]!.addAll(times);
+      }
     } else {
-      if (dayIndexBackward == 0) backward["weekday"]!.addAll(times);
-      if (dayIndexBackward == 1) backward["saturday"]!.addAll(times);
-      if (dayIndexBackward == 2) backward["sunday"]!.addAll(times);
-      hasBackwardTimes = true;
+      // ZPĚT
+      if (first.startsWith("4:")) {
+        backwardFourCount++;
+        if (backwardFourCount == 1) dayIndexBackward = 0; // weekday
+        if (backwardFourCount == 2) dayIndexBackward = 1; // saturday
+        if (backwardFourCount == 3) dayIndexBackward = 2; // sunday
+      }
+
+      if (dayIndexBackward == 0) {
+        backward["weekday"]!.addAll(times);
+      } else if (dayIndexBackward == 1) {
+        backward["saturday"]!.addAll(times);
+      } else {
+        backward["sunday"]!.addAll(times);
+      }
     }
   }
 
