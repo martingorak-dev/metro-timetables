@@ -33,14 +33,17 @@ Future<void> main() async {
     }
   };
 
-  // Pro pohodlný přístup si to vytáhneme do proměnných s přesným typem
   final forward =
   (result["directions"] as Map<String, dynamic>)["forward"] as Map<String, List<String>>;
   final backward =
   (result["directions"] as Map<String, dynamic>)["backward"] as Map<String, List<String>>;
 
-  int blockIndex = 0; // 0–2 = TAM, 3–5 = ZPĚT
-  bool hasAnyTimesInCurrentBlock = false;
+  int depoCount = 0; // kolikrát jsme narazili na DEPO
+  int dayIndexForward = 0;
+  int dayIndexBackward = 0;
+
+  bool hasForwardTimes = false;
+  bool hasBackwardTimes = false;
 
   for (final rawLine in lines) {
     final line = rawLine.trim();
@@ -49,35 +52,33 @@ Future<void> main() async {
     final times = timeRegex.allMatches(line).map((m) => m.group(0)!).toList();
     if (times.isEmpty) continue;
 
-    // první čas 4:xx → může znamenat nový blok
+    depoCount++;
+
+    // určení směru podle pořadí výskytů
+    bool isForward = depoCount <= 3;
+    bool isBackward = depoCount > 3;
+
+    // přepnutí dne – jen v rámci stejného směru
     if (times.first.startsWith("4:")) {
-      if (hasAnyTimesInCurrentBlock && blockIndex < 5) {
-        blockIndex++;
-        hasAnyTimesInCurrentBlock = false;
+      if (isForward && hasForwardTimes && dayIndexForward < 2) {
+        dayIndexForward++;
+      }
+      if (isBackward && hasBackwardTimes && dayIndexBackward < 2) {
+        dayIndexBackward++;
       }
     }
 
-    if (blockIndex <= 2) {
-      // TAM
-      if (blockIndex == 0) {
-        forward["weekday"]!.addAll(times);
-      } else if (blockIndex == 1) {
-        forward["saturday"]!.addAll(times);
-      } else if (blockIndex == 2) {
-        forward["sunday"]!.addAll(times);
-      }
+    if (isForward) {
+      if (dayIndexForward == 0) forward["weekday"]!.addAll(times);
+      if (dayIndexForward == 1) forward["saturday"]!.addAll(times);
+      if (dayIndexForward == 2) forward["sunday"]!.addAll(times);
+      hasForwardTimes = true;
     } else {
-      // ZPĚT
-      if (blockIndex == 3) {
-        backward["weekday"]!.addAll(times);
-      } else if (blockIndex == 4) {
-        backward["saturday"]!.addAll(times);
-      } else if (blockIndex == 5) {
-        backward["sunday"]!.addAll(times);
-      }
+      if (dayIndexBackward == 0) backward["weekday"]!.addAll(times);
+      if (dayIndexBackward == 1) backward["saturday"]!.addAll(times);
+      if (dayIndexBackward == 2) backward["sunday"]!.addAll(times);
+      hasBackwardTimes = true;
     }
-
-    hasAnyTimesInCurrentBlock = true;
   }
 
   final outFile = File('json/A.json');
