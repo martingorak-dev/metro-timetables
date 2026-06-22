@@ -8,7 +8,7 @@ Future<void> main() async {
   final lines = input.readAsLinesSync();
   final timeRegex = RegExp(r'\b\d{1,2}:\d{2}\b');
 
-  // Linka A
+  // Linka A – stanice ve směru TAM
   const stationsForward = [
     "DEPO HOSTIVAŘ",
     "Skalka",
