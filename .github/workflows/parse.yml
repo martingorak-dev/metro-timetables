@@ -16,7 +16,8 @@ jobs:
       - name: Detect changed PDF files
         id: changes
         run: |
-          echo "changed=$(git diff --name-only HEAD~1 HEAD | grep '^pdf/' || true)" >> $GITHUB_OUTPUT
+          echo "modified=${{ join(github.event.head_commit.modified, ' ') }}" >> $GITHUB_OUTPUT
+          echo "added=${{ join(github.event.head_commit.added, ' ') }}" >> $GITHUB_OUTPUT
 
       - name: Install Poppler (pdftotext)
         run: |
@@ -26,14 +27,18 @@ jobs:
       - name: Convert only changed PDFs to text
         run: |
           mkdir -p ocr
-          for f in ${{ steps.changes.outputs.changed }}; do
-            base=$(basename "$f")
-            prefix=${base:0:1}
-            upper=$(echo "$prefix" | tr '[:lower:]' '[:upper:]')
+          changed_files="${{ steps.changes.outputs.modified }} ${{ steps.changes.outputs.added }}"
 
-            if [ "$upper" = "A" ] || [ "$upper" = "B" ] || [ "$upper" = "C" ]; then
-              echo "Converting changed file $f → ocr/$upper.txt"
-              pdftotext -layout "$f" "ocr/$upper.txt"
+          for f in $changed_files; do
+            if [[ "$f" == pdf/* ]]; then
+              base=$(basename "$f")
+              prefix=${base:0:1}
+              upper=$(echo "$prefix" | tr '[:lower:]' '[:upper:]')
+
+              if [ "$upper" = "A" ] || [ "$upper" = "B" ] || [ "$upper" = "C" ]; then
+                echo "Converting changed file $f → ocr/$upper.txt"
+                pdftotext -layout "$f" "ocr/$upper.txt"
+              fi
             fi
           done
 
@@ -42,14 +47,18 @@ jobs:
 
       - name: Run parser only for changed lines
         run: |
-          for f in ${{ steps.changes.outputs.changed }}; do
-            base=$(basename "$f")
-            prefix=${base:0:1}
-            upper=$(echo "$prefix" | tr '[:lower:]' '[:upper:]')
+          changed_files="${{ steps.changes.outputs.modified }} ${{ steps.changes.outputs.added }}"
 
-            if [ -f "ocr/$upper.txt" ]; then
-              echo "Parsing line $upper"
-              dart run parser/parser.dart $upper
+          for f in $changed_files; do
+            if [[ "$f" == pdf/* ]]; then
+              base=$(basename "$f")
+              prefix=${base:0:1}
+              upper=$(echo "$prefix" | tr '[:lower:]' '[:upper:]')
+
+              if [ -f "ocr/$upper.txt" ]; then
+                echo "Parsing line $upper"
+                dart run parser/parser.dart $upper
+              fi
             fi
           done
 
