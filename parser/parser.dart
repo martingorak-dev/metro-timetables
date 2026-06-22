@@ -25,16 +25,14 @@ Future<void> main() async {
     }
   };
 
-  // bezpečné přetypování
-  final forward = (result["directions"] as Map<String, dynamic>)["forward"]
-  as Map<String, List<String>>;
-  final backward = (result["directions"] as Map<String, dynamic>)["backward"]
-  as Map<String, List<String>>;
+  final forward =
+  (result["directions"] as Map<String, dynamic>)["forward"] as Map<String, List<String>>;
+  final backward =
+  (result["directions"] as Map<String, dynamic>)["backward"] as Map<String, List<String>>;
 
-  String direction = "forward"; // začínáme TAM
-  int dayIndex = 0;             // 0=PD,1=SO,2=NE
-
-  String? lastFirstTime;        // první čas předchozího bloku
+  int fourRowCount = 0;      // kolikátý řádek Depa začínající 4:xx
+  String direction = "forward";
+  int dayIndex = 0;          // 0=weekday,1=saturday,2=sunday
 
   for (final line in lines) {
     if (!line.contains(station)) continue;
@@ -44,20 +42,21 @@ Future<void> main() async {
 
     final first = times.first;
 
-    // přepnutí dne: 4:xx po bloku, který nezačínal 4:xx
-    if (first.startsWith("4:") &&
-        lastFirstTime != null &&
-        !lastFirstTime.startsWith("4:")) {
-      dayIndex++;
+    // pokud řádek Depa začíná 4:xx → posuneme se v „mapě“ (TAM/ZPĚT × den)
+    if (first.startsWith("4:")) {
+      fourRowCount++;
 
-      if (dayIndex == 3) {
+      if (fourRowCount >= 1 && fourRowCount <= 3) {
+        direction = "forward";
+        dayIndex = fourRowCount - 1; // 1→0, 2→1, 3→2
+      } else if (fourRowCount >= 4 && fourRowCount <= 6) {
         direction = "backward";
-        dayIndex = 0;
+        dayIndex = fourRowCount - 4; // 4→0, 5→1, 6→2
       }
+      // (kdyby tam bylo víc než 6, můžeš případně ošetřit, ale pro linku A to stačí)
     }
 
-
-    // uložení časů
+    // uložení časů podle aktuálního směru a dne
     if (direction == "forward") {
       if (dayIndex == 0) forward["weekday"]!.addAll(times);
       if (dayIndex == 1) forward["saturday"]!.addAll(times);
@@ -67,8 +66,6 @@ Future<void> main() async {
       if (dayIndex == 1) backward["saturday"]!.addAll(times);
       if (dayIndex == 2) backward["sunday"]!.addAll(times);
     }
-
-    lastFirstTime = first;
   }
 
   File('json/A.json').writeAsStringSync(
