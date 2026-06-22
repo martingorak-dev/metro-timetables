@@ -30,9 +30,12 @@ Future<void> main() async {
   final backward =
   (result["directions"] as Map<String, dynamic>)["backward"] as Map<String, List<String>>;
 
-  int fourRowCount = 0;      // kolikátý řádek Depa začínající 4:xx
+  int dayStartCount = 0;     // kolikátý „den-start“ blok jsme viděli
   String direction = "forward";
   int dayIndex = 0;          // 0=weekday,1=saturday,2=sunday
+
+  bool isDayStart(String t) =>
+      t.startsWith("3:") || t.startsWith("4:") || t.startsWith("5:");
 
   for (final line in lines) {
     if (!line.contains(station)) continue;
@@ -42,21 +45,20 @@ Future<void> main() async {
 
     final first = times.first;
 
-    // pokud řádek Depa začíná 4:xx → posuneme se v „mapě“ (TAM/ZPĚT × den)
-    if (first.startsWith("4:")) {
-      fourRowCount++;
+    // pokud řádek Depa začíná 3/4/5 → nový den
+    if (isDayStart(first)) {
+      dayStartCount++;
 
-      if (fourRowCount >= 1 && fourRowCount <= 3) {
+      if (dayStartCount <= 3) {
         direction = "forward";
-        dayIndex = fourRowCount - 1; // 1→0, 2→1, 3→2
-      } else if (fourRowCount >= 4 && fourRowCount <= 6) {
+        dayIndex = dayStartCount - 1; // 1→0, 2→1, 3→2
+      } else if (dayStartCount <= 6) {
         direction = "backward";
-        dayIndex = fourRowCount - 4; // 4→0, 5→1, 6→2
+        dayIndex = dayStartCount - 4; // 4→0, 5→1, 6→2
       }
-      // (kdyby tam bylo víc než 6, můžeš případně ošetřit, ale pro linku A to stačí)
     }
 
-    // uložení časů podle aktuálního směru a dne
+    // uložení časů
     if (direction == "forward") {
       if (dayIndex == 0) forward["weekday"]!.addAll(times);
       if (dayIndex == 1) forward["saturday"]!.addAll(times);
