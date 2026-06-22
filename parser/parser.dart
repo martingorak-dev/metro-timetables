@@ -8,6 +8,8 @@ Future<void> main() async {
   final lines = input.readAsLinesSync();
   final timeRegex = RegExp(r'\b\d{1,2}:\d{2}\b');
 
+  const depot = "DEPO HOSTIVAŘ";
+
   // všechny stanice linky A
   const stations = [
     "DEPO HOSTIVAŘ",
@@ -28,20 +30,52 @@ Future<void> main() async {
     "NEMOCNICE MOTOL"
   ];
 
-  final result = {
-    "line": "A",
-    "stations": <String, dynamic>{}
-  };
-
-  // přetypování – TOTO JE KLÍČ
-  final stationsMap = result["stations"] as Map<String, dynamic>;
-
   bool isDayStart(String t) =>
       t.startsWith("3:") || t.startsWith("4:") || t.startsWith("5:");
 
-  // PRO KAŽDOU STANICI ZVLÁŠŤ
+  // 1) PRŮCHOD – jen DH, zjistíme pro každý řádek direction + dayIndex
+  final directionsForLine = List<String>.filled(lines.length, "forward");
+  final dayIndexForLine = List<int>.filled(lines.length, 0);
+
+  int dayStartCount = 0;
+  String direction = "forward";
+  int dayIndex = 0;
+
+  for (int i = 0; i < lines.length; i++) {
+    final line = lines[i];
+
+    if (line.contains(depot)) {
+      final times = timeRegex.allMatches(line).map((m) => m.group(0)!).toList();
+      if (times.isNotEmpty) {
+        final first = times.first;
+
+        if (isDayStart(first)) {
+          dayStartCount++;
+
+          if (dayStartCount <= 3) {
+            direction = "forward";
+            dayIndex = dayStartCount - 1;
+          } else if (dayStartCount <= 6) {
+            direction = "backward";
+            dayIndex = dayStartCount - 4;
+          }
+        }
+      }
+    }
+
+    directionsForLine[i] = direction;
+    dayIndexForLine[i] = dayIndex;
+  }
+
+  // 2) PRŮCHOD – všechny stanice, používáme rozdělení podle DH
+  final result = {
+    "line": "A",
+    "stations": <String, dynamic>{},
+  };
+
+  final stationsMap = result["stations"] as Map<String, dynamic>;
+
   for (final station in stations) {
-    // přesně tvůj původní DH blok
     final stationBlock = {
       "forward": {
         "weekday": <String>[],
@@ -58,45 +92,24 @@ Future<void> main() async {
     final forward = stationBlock["forward"] as Map<String, List<String>>;
     final backward = stationBlock["backward"] as Map<String, List<String>>;
 
-    int dayStartCount = 0;
-    String direction = "forward";
-    int dayIndex = 0;
-
-    // projdeme celý soubor – ale jen řádky této stanice
-    for (final line in lines) {
+    for (int i = 0; i < lines.length; i++) {
+      final line = lines[i];
       if (!line.contains(station)) continue;
 
       final times = timeRegex.allMatches(line).map((m) => m.group(0)!).toList();
       if (times.isEmpty) continue;
 
-      final first = times.first;
+      final dir = directionsForLine[i];
+      final idx = dayIndexForLine[i];
+      final dayName = ["weekday", "saturday", "sunday"][idx];
 
-      // přesně tvoje DH logika
-      if (isDayStart(first)) {
-        dayStartCount++;
-
-        if (dayStartCount <= 3) {
-          direction = "forward";
-          dayIndex = dayStartCount - 1;
-        } else if (dayStartCount <= 6) {
-          direction = "backward";
-          dayIndex = dayStartCount - 4;
-        }
-      }
-
-      // uložení časů – přesně jako DH
-      if (direction == "forward") {
-        if (dayIndex == 0) forward["weekday"]!.addAll(times);
-        if (dayIndex == 1) forward["saturday"]!.addAll(times);
-        if (dayIndex == 2) forward["sunday"]!.addAll(times);
+      if (dir == "forward") {
+        forward[dayName]!.addAll(times);
       } else {
-        if (dayIndex == 0) backward["weekday"]!.addAll(times);
-        if (dayIndex == 1) backward["saturday"]!.addAll(times);
-        if (dayIndex == 2) backward["sunday"]!.addAll(times);
+        backward[dayName]!.addAll(times);
       }
     }
 
-    // uložíme výsledek pro tuto stanici
     stationsMap[station] = stationBlock;
   }
 
