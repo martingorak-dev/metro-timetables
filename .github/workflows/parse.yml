@@ -4,6 +4,8 @@ on:
   push:
     paths:
       - "pdf/*.pdf"
+      - "parser/**"
+      - ".github/workflows/parse.yml"
 
 jobs:
   parse:
