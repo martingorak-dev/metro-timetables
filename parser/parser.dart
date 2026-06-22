@@ -1,11 +1,34 @@
 import 'dart:io';
 import 'dart:convert';
 
+// Normalizace textu pro OCR (bez diakritiky, sjednocení mezer, lowercase)
+String normalize(String s) {
+  return s
+      .toLowerCase()
+      .replaceAll(RegExp(r'[áä]'), 'a')
+      .replaceAll(RegExp(r'[č]'), 'c')
+      .replaceAll(RegExp(r'[ď]'), 'd')
+      .replaceAll(RegExp(r'[éě]'), 'e')
+      .replaceAll(RegExp(r'[í]'), 'i')
+      .replaceAll(RegExp(r'[ň]'), 'n')
+      .replaceAll(RegExp(r'[óö]'), 'o')
+      .replaceAll(RegExp(r'[ř]'), 'r')
+      .replaceAll(RegExp(r'[š]'), 's')
+      .replaceAll(RegExp(r'[ť]'), 't')
+      .replaceAll(RegExp(r'[úů]'), 'u')
+      .replaceAll(RegExp(r'[ý]'), 'y')
+      .replaceAll(RegExp(r'[ž]'), 'z')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
+}
+
 Future<void> main() async {
   final input = File('ocr/output.txt');
   if (!input.existsSync()) return;
 
   final lines = input.readAsLinesSync();
+  final normalizedLines = lines.map(normalize).toList();
+
   final timeRegex = RegExp(r'\b\d{1,2}:\d{2}\b');
 
   // všechny stanice linky A
@@ -40,11 +63,8 @@ Future<void> main() async {
 
   // PRO KAŽDOU STANICI ZVLÁŠŤ
   for (final station in stations) {
-    // OCR‑odolný regex pro název stanice
-    final stationPattern =
-    RegExp('\\b${RegExp.escape(station)}\\b', caseSensitive: false);
+    final normalizedStation = normalize(station);
 
-    // přesně tvůj původní DH blok
     final stationBlock = {
       "forward": {
         "weekday": <String>[],
@@ -65,12 +85,13 @@ Future<void> main() async {
     String direction = "forward";
     int dayIndex = 0;
 
-    // projdeme celý soubor – ale jen řádky této stanice
-    for (final line in lines) {
-      if (!stationPattern.hasMatch(line)) continue;
+    for (int i = 0; i < normalizedLines.length; i++) {
+      final line = normalizedLines[i];
 
-      final times =
-      timeRegex.allMatches(line).map((m) => m.group(0)!).toList();
+      // OCR‑odolné hledání stanice
+      if (!line.contains(normalizedStation)) continue;
+
+      final times = timeRegex.allMatches(lines[i]).map((m) => m.group(0)!).toList();
       if (times.isEmpty) continue;
 
       final first = times.first;
@@ -88,7 +109,7 @@ Future<void> main() async {
         }
       }
 
-      // uložení časů – přesně jako DH
+      // uložení časů
       if (direction == "forward") {
         if (dayIndex == 0) forward["weekday"]!.addAll(times);
         if (dayIndex == 1) forward["saturday"]!.addAll(times);
@@ -100,7 +121,6 @@ Future<void> main() async {
       }
     }
 
-    // uložíme výsledek pro tuto stanici
     stationsMap[station] = stationBlock;
   }
 
