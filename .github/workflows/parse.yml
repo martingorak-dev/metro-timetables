@@ -13,40 +13,45 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      - name: Detect changed PDF files
+        id: changes
+        run: |
+          echo "changed=$(git diff --name-only HEAD~1 HEAD | grep '^pdf/' || true)" >> $GITHUB_OUTPUT
+
       - name: Install Poppler (pdftotext)
         run: |
           sudo apt-get update
           sudo apt-get install -y poppler-utils
 
-      - name: Convert PDFs to text (A, B, C by prefix)
+      - name: Convert only changed PDFs to text
         run: |
           mkdir -p ocr
-          rm -f ocr/A.txt ocr/B.txt ocr/C.txt
-
-          for f in pdf/*.pdf; do
+          for f in ${{ steps.changes.outputs.changed }}; do
             base=$(basename "$f")
             prefix=${base:0:1}
             upper=$(echo "$prefix" | tr '[:lower:]' '[:upper:]')
 
             if [ "$upper" = "A" ] || [ "$upper" = "B" ] || [ "$upper" = "C" ]; then
-              echo "Converting $f → ocr/$upper.txt"
+              echo "Converting changed file $f → ocr/$upper.txt"
               pdftotext -layout "$f" "ocr/$upper.txt"
-            else
-              echo "Skipping $f (unknown prefix)"
             fi
           done
 
       - name: Install Dart SDK
         uses: dart-lang/setup-dart@v1
 
-      - name: Run Dart parser for A
-        run: dart run parser/parser.dart A
+      - name: Run parser only for changed lines
+        run: |
+          for f in ${{ steps.changes.outputs.changed }}; do
+            base=$(basename "$f")
+            prefix=${base:0:1}
+            upper=$(echo "$prefix" | tr '[:lower:]' '[:upper:]')
 
-      - name: Run Dart parser for B
-        run: dart run parser/parser.dart B
-
-      - name: Run Dart parser for C
-        run: dart run parser/parser.dart C
+            if [ -f "ocr/$upper.txt" ]; then
+              echo "Parsing line $upper"
+              dart run parser/parser.dart $upper
+            fi
+          done
 
       - name: Commit results
         run: |
