@@ -8,12 +8,44 @@ Future<void> main() async {
   final lines = input.readAsLinesSync();
   final timeRegex = RegExp(r'\b\d{1,2}:\d{2}\b');
 
-  // OCR‑odolné hledání názvu stanice
-  final stationPattern = RegExp(r'\bSkalka\b', caseSensitive: false);
+  // všechny stanice linky A
+  const stations = [
+    "DEPO HOSTIVAŘ",
+    "Skalka",
+    "Strašnická",
+    "Želivského",
+    "Jiřího z Poděbrad",
+    "Náměstí Míru",
+    "Muzeum - A",
+    "Můstek - A",
+    "Staroměstská",
+    "Malostranská",
+    "Hradčanská",
+    "Dejvická",
+    "Bořislavka",
+    "Nádraží Veleslavín",
+    "Petřiny",
+    "NEMOCNICE MOTOL"
+  ];
 
   final result = {
     "line": "A",
-    "directions": {
+    "stations": <String, dynamic>{}
+  };
+
+  final stationsMap = result["stations"] as Map<String, dynamic>;
+
+  bool isDayStart(String t) =>
+      t.startsWith("3:") || t.startsWith("4:") || t.startsWith("5:");
+
+  // PRO KAŽDOU STANICI ZVLÁŠŤ
+  for (final station in stations) {
+    // OCR‑odolný regex pro název stanice
+    final stationPattern =
+    RegExp('\\b${RegExp.escape(station)}\\b', caseSensitive: false);
+
+    // přesně tvůj původní DH blok
+    final stationBlock = {
       "forward": {
         "weekday": <String>[],
         "saturday": <String>[],
@@ -24,53 +56,52 @@ Future<void> main() async {
         "saturday": <String>[],
         "sunday": <String>[],
       }
-    }
-  };
+    };
 
-  final forward =
-  (result["directions"] as Map<String, dynamic>)["forward"] as Map<String, List<String>>;
-  final backward =
-  (result["directions"] as Map<String, dynamic>)["backward"] as Map<String, List<String>>;
+    final forward = stationBlock["forward"] as Map<String, List<String>>;
+    final backward = stationBlock["backward"] as Map<String, List<String>>;
 
-  int dayStartCount = 0;     // kolikátý „den-start“ blok jsme viděli
-  String direction = "forward";
-  int dayIndex = 0;          // 0=weekday,1=saturday,2=sunday
+    int dayStartCount = 0;
+    String direction = "forward";
+    int dayIndex = 0;
 
-  bool isDayStart(String t) =>
-      t.startsWith("3:") || t.startsWith("4:") || t.startsWith("5:");
+    // projdeme celý soubor – ale jen řádky této stanice
+    for (final line in lines) {
+      if (!stationPattern.hasMatch(line)) continue;
 
-  for (final line in lines) {
-    // OCR‑odolné hledání stanice
-    if (!stationPattern.hasMatch(line)) continue;
+      final times =
+      timeRegex.allMatches(line).map((m) => m.group(0)!).toList();
+      if (times.isEmpty) continue;
 
-    final times = timeRegex.allMatches(line).map((m) => m.group(0)!).toList();
-    if (times.isEmpty) continue;
+      final first = times.first;
 
-    final first = times.first;
+      // přesně tvoje DH logika
+      if (isDayStart(first)) {
+        dayStartCount++;
 
-    // pokud řádek začíná 3/4/5 → nový den
-    if (isDayStart(first)) {
-      dayStartCount++;
+        if (dayStartCount <= 3) {
+          direction = "forward";
+          dayIndex = dayStartCount - 1;
+        } else if (dayStartCount <= 6) {
+          direction = "backward";
+          dayIndex = dayStartCount - 4;
+        }
+      }
 
-      if (dayStartCount <= 3) {
-        direction = "forward";
-        dayIndex = dayStartCount - 1; // 1→0, 2→1, 3→2
-      } else if (dayStartCount <= 6) {
-        direction = "backward";
-        dayIndex = dayStartCount - 4; // 4→0, 5→1, 6→2
+      // uložení časů – přesně jako DH
+      if (direction == "forward") {
+        if (dayIndex == 0) forward["weekday"]!.addAll(times);
+        if (dayIndex == 1) forward["saturday"]!.addAll(times);
+        if (dayIndex == 2) forward["sunday"]!.addAll(times);
+      } else {
+        if (dayIndex == 0) backward["weekday"]!.addAll(times);
+        if (dayIndex == 1) backward["saturday"]!.addAll(times);
+        if (dayIndex == 2) backward["sunday"]!.addAll(times);
       }
     }
 
-    // uložení časů
-    if (direction == "forward") {
-      if (dayIndex == 0) forward["weekday"]!.addAll(times);
-      if (dayIndex == 1) forward["saturday"]!.addAll(times);
-      if (dayIndex == 2) forward["sunday"]!.addAll(times);
-    } else {
-      if (dayIndex == 0) backward["weekday"]!.addAll(times);
-      if (dayIndex == 1) backward["saturday"]!.addAll(times);
-      if (dayIndex == 2) backward["sunday"]!.addAll(times);
-    }
+    // uložíme výsledek pro tuto stanici
+    stationsMap[station] = stationBlock;
   }
 
   File('json/A.json').writeAsStringSync(
