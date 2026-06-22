@@ -7,67 +7,165 @@ Future<void> main() async {
 
   final lines = input.readAsLinesSync();
   final timeRegex = RegExp(r'\b\d{1,2}:\d{2}\b');
-  const station = "DEPO HOSTIVAŘ";
 
+  // -------------------------------
+  // LINKA A (aktivní)
+  // -------------------------------
+  const stationsForward = [
+    "DEPO HOSTIVAŘ",
+    "Skalka",
+    "Strašnická",
+    "Želivského",
+    "Jiřího z Poděbrad",
+    "Náměstí Míru",
+    "Muzeum - A",
+    "Můstek - A",
+    "Staroměstská",
+    "Malostranská",
+    "Hradčanská",
+    "Dejvická",
+    "Bořislavka",
+    "Nádraží Veleslavín",
+    "Petřiny",
+    "NEMOCNICE MOTOL"
+  ];
+
+  // -------------------------------
+  // LINKA B (zatím zakomentovaná)
+  // -------------------------------
+  /*
+  const stationsForward = [
+    "Zličín",
+    "Stodůlky",
+    "Luka",
+    "Lužiny",
+    "Hůrka",
+    "Nové Butovice",
+    "Jinonice",
+    "Radlická",
+    "Smíchovské nádraží",
+    "Anděl",
+    "Karlovo náměstí",
+    "Národní třída",
+    "Můstek - B",
+    "Náměstí Republiky",
+    "Florenc - B",
+    "Křižíkova",
+    "Invalidovna",
+    "Palmovka",
+    "Českomoravská",
+    "Vysočanská",
+    "Kolbenova",
+    "Hloubětín",
+    "Rajská zahrada",
+    "Černý Most"
+  ];
+  */
+
+  // -------------------------------
+  // LINKA C (zatím zakomentovaná)
+  // -------------------------------
+  /*
+  const stationsForward = [
+    "Letňany",
+    "Prosek",
+    "Střížkov",
+    "Ládví",
+    "Kobylisy",
+    "Nádraží Holešovice",
+    "Vltavská",
+    "Florenc - C",
+    "Hlavní nádraží",
+    "Muzeum - C",
+    "I. P. Pavlova",
+    "Vyšehrad",
+    "Pražského povstání",
+    "Pankrác",
+    "Budějovická",
+    "Kačerov",
+    "Roztyly",
+    "Chodov",
+    "Opatov",
+    "Háje"
+  ];
+  */
+
+  // -------------------------------
+  // Výstupní struktura
+  // -------------------------------
   final result = {
     "line": "A",
     "directions": {
-      "forward": {
-        "weekday": <String>[],
-        "saturday": <String>[],
-        "sunday": <String>[],
-      },
-      "backward": {
-        "weekday": <String>[],
-        "saturday": <String>[],
-        "sunday": <String>[],
-      }
+      "forward": <String, Map<String, List<String>>>{},
+      "backward": <String, Map<String, List<String>>>{},
     }
   };
 
-  final forward =
-  (result["directions"] as Map<String, dynamic>)["forward"] as Map<String, List<String>>;
-  final backward =
-  (result["directions"] as Map<String, dynamic>)["backward"] as Map<String, List<String>>;
+  final directions = result["directions"] as Map<String, dynamic>;
+  final forward = directions["forward"] as Map<String, Map<String, List<String>>>;
+  final backward = directions["backward"] as Map<String, Map<String, List<String>>>;
 
-  int dayStartCount = 0;     // kolikátý „den-start“ blok jsme viděli
+  // Inicializace všech stanic
+  for (final s in stationsForward) {
+    forward[s] = {
+      "weekday": <String>[],
+      "saturday": <String>[],
+      "sunday": <String>[],
+    };
+    backward[s] = {
+      "weekday": <String>[],
+      "saturday": <String>[],
+      "sunday": <String>[],
+    };
+  }
+
+  // První stanice = marker dne
+  final dayMarker = stationsForward.first;
+
+  int dayStartCount = 0;
   String direction = "forward";
-  int dayIndex = 0;          // 0=weekday,1=saturday,2=sunday
+  int dayIndex = 0;
 
   bool isDayStart(String t) =>
       t.startsWith("3:") || t.startsWith("4:") || t.startsWith("5:");
 
   for (final line in lines) {
-    if (!line.contains(station)) continue;
+    // Najdeme stanici
+    final station = stationsForward.firstWhere(
+          (s) => line.contains(s),
+      orElse: () => "",
+    );
+    if (station.isEmpty) continue;
 
     final times = timeRegex.allMatches(line).map((m) => m.group(0)!).toList();
     if (times.isEmpty) continue;
 
     final first = times.first;
 
-    // pokud řádek Depa začíná 3/4/5 → nový den
-    if (isDayStart(first)) {
+    // První stanice řídí den a směr
+    if (station == dayMarker && isDayStart(first)) {
       dayStartCount++;
 
       if (dayStartCount <= 3) {
         direction = "forward";
-        dayIndex = dayStartCount - 1; // 1→0, 2→1, 3→2
+        dayIndex = dayStartCount - 1;
       } else if (dayStartCount <= 6) {
         direction = "backward";
-        dayIndex = dayStartCount - 4; // 4→0, 5→1, 6→2
+        dayIndex = dayStartCount - 4;
       }
     }
 
-    // uložení časů
-    if (direction == "forward") {
-      if (dayIndex == 0) forward["weekday"]!.addAll(times);
-      if (dayIndex == 1) forward["saturday"]!.addAll(times);
-      if (dayIndex == 2) forward["sunday"]!.addAll(times);
-    } else {
-      if (dayIndex == 0) backward["weekday"]!.addAll(times);
-      if (dayIndex == 1) backward["saturday"]!.addAll(times);
-      if (dayIndex == 2) backward["sunday"]!.addAll(times);
-    }
+    // Uložení časů
+    final target = direction == "forward" ? forward : backward;
+    final dayName = ["weekday", "saturday", "sunday"][dayIndex];
+
+    final stationMap = target[station];
+    if (stationMap == null) continue;
+
+    final list = stationMap[dayName];
+    if (list == null) continue;
+
+    list.addAll(times);
   }
 
   File('json/A.json').writeAsStringSync(
