@@ -8,8 +8,8 @@ Future<void> main() async {
   final lines = input.readAsLinesSync();
   final timeRegex = RegExp(r'\b\d{1,2}:\d{2}\b');
 
-  // ZMĚNA ZDE:
-  const station = "Skalka";
+  // OCR‑odolné hledání názvu stanice
+  final stationPattern = RegExp(r'\bSkalka\b', caseSensitive: false);
 
   final result = {
     "line": "A",
@@ -40,7 +40,8 @@ Future<void> main() async {
       t.startsWith("3:") || t.startsWith("4:") || t.startsWith("5:");
 
   for (final line in lines) {
-    if (!line.contains(station)) continue;
+    // OCR‑odolné hledání stanice
+    if (!stationPattern.hasMatch(line)) continue;
 
     final times = timeRegex.allMatches(line).map((m) => m.group(0)!).toList();
     if (times.isEmpty) continue;
