@@ -8,8 +8,8 @@ Future<void> main() async {
   final lines = input.readAsLinesSync();
   final timeRegex = RegExp(r'\b\d{1,2}:\d{2}\b');
 
-  // Linka A – stanice ve směru TAM
-  const stationsForward = [
+  // Linka A
+  const stations = [
     "DEPO HOSTIVAŘ",
     "Skalka",
     "Strašnická",
@@ -28,7 +28,7 @@ Future<void> main() async {
     "NEMOCNICE MOTOL"
   ];
 
-  // Výstupní struktura – každá stanice má svůj blok
+  // Výstupní struktura
   final result = {
     "line": "A",
     "stations": <String, dynamic>{}
@@ -36,8 +36,10 @@ Future<void> main() async {
 
   final stationsMap = result["stations"] as Map<String, dynamic>;
 
-  // Inicializace všech stanic
-  for (final s in stationsForward) {
+  // Stav pro každou stanici
+  final state = <String, Map<String, dynamic>>{};
+
+  for (final s in stations) {
     stationsMap[s] = {
       "forward": {
         "weekday": <String>[],
@@ -50,21 +52,20 @@ Future<void> main() async {
         "sunday": <String>[],
       }
     };
+
+    state[s] = {
+      "dayStartCount": 0,
+      "direction": "forward",
+      "dayIndex": 0
+    };
   }
-
-  // První stanice = marker dne
-  final dayMarker = stationsForward.first;
-
-  int dayStartCount = 0;
-  String direction = "forward";
-  int dayIndex = 0;
 
   bool isDayStart(String t) =>
       t.startsWith("3:") || t.startsWith("4:") || t.startsWith("5:");
 
   for (final line in lines) {
     // Najdeme stanici
-    final station = stationsForward.firstWhere(
+    final station = stations.firstWhere(
           (s) => line.contains(s),
       orElse: () => "",
     );
@@ -75,8 +76,14 @@ Future<void> main() async {
 
     final first = times.first;
 
-    // Marker řídí den a směr
-    if (station == dayMarker && isDayStart(first)) {
+    // Stav stanice
+    final st = state[station]!;
+    int dayStartCount = st["dayStartCount"];
+    String direction = st["direction"];
+    int dayIndex = st["dayIndex"];
+
+    // Nový den pro tuto stanici
+    if (isDayStart(first)) {
       dayStartCount++;
 
       if (dayStartCount <= 3) {
@@ -86,9 +93,13 @@ Future<void> main() async {
         direction = "backward";
         dayIndex = dayStartCount - 4;
       }
+
+      st["dayStartCount"] = dayStartCount;
+      st["direction"] = direction;
+      st["dayIndex"] = dayIndex;
     }
 
-    // Uložení časů do správné stanice
+    // Uložení časů
     final stationBlock = stationsMap[station] as Map<String, dynamic>;
     final dirBlock = stationBlock[direction] as Map<String, List<String>>;
     final dayName = ["weekday", "saturday", "sunday"][dayIndex];
