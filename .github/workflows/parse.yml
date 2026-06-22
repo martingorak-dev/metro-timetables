@@ -20,31 +20,35 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y poppler-utils
 
-      - name: Convert ALL existing PDFs to text
+      - name: Convert PDFs to text (always)
         run: |
           mkdir -p ocr
+          mkdir -p ocr_new
           for f in pdf/*.pdf; do
             base=$(basename "$f")
             prefix=${base:0:1}
             upper=$(echo "$prefix" | tr '[:lower:]' '[:upper:]')
 
             if [ "$upper" = "A" ] || [ "$upper" = "B" ] || [ "$upper" = "C" ]; then
-              echo "Converting $f → ocr/$upper.txt"
-              pdftotext -layout "$f" "ocr/$upper.txt"
+              echo "Converting $f → ocr_new/$upper.txt"
+              pdftotext -layout "$f" "ocr_new/$upper.txt"
             fi
           done
 
       - name: Install Dart SDK
         uses: dart-lang/setup-dart@v1
 
-      - name: Run parser for A/B/C if TXT exists
+      - name: Compare TXT and run parser only if changed
         run: |
           for line in A B C; do
-            if [ -f "ocr/$line.txt" ]; then
-              echo "Parsing line $line"
-              dart run parser/parser.dart $line
-            else
-              echo "Skipping $line – no TXT file"
+            if [ -f "ocr_new/$line.txt" ]; then
+              if ! cmp -s "ocr_new/$line.txt" "ocr/$line.txt"; then
+                echo "TXT for $line changed → updating"
+                mv "ocr_new/$line.txt" "ocr/$line.txt"
+                dart run parser/parser.dart $line
+              else
+                echo "TXT for $line unchanged → skipping"
+              fi
             fi
           done
 
