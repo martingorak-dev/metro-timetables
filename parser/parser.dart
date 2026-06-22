@@ -27,15 +27,14 @@ Future<void> main() async {
     }
   };
 
-  String? currentDirection; // "forward" / "backward"
-  int dayIndexForward = 0;  // 0=weekday, 1=saturday, 2=sunday
-  int dayIndexBackward = 0;
+  String? currentDirection; // forward / backward
+  int currentDay = 0;       // 0=weekday, 1=saturday, 2=sunday
 
-  String dayName(int index) =>
-      index == 0 ? "weekday" : index == 1 ? "saturday" : "sunday";
+  String dayName(int i) =>
+      i == 0 ? "weekday" : i == 1 ? "saturday" : "sunday";
 
-  bool hasForwardData = false;
-  bool hasBackwardData = false;
+  bool startedForward = false;
+  bool startedBackward = false;
 
   for (final rawLine in lines) {
     final line = rawLine.trim();
@@ -48,38 +47,32 @@ Future<void> main() async {
     final times = timeRegex.allMatches(line).map((m) => m.group(0)!).toList();
     if (times.isEmpty) continue;
 
-    // Určení směru + přepínání dne
-    if (stationName == firstForwardStation &&
-        // nesmíme přepnout na forward, pokud jsme u DEPA v rámci směru ZPĚT
-        currentDirection != "backward") {
-      if (hasForwardData &&
-          times.first.startsWith("4:") &&
-          dayIndexForward < 2) {
-        dayIndexForward++;
-      }
+    // 1) ZAČÁTEK SMĚRU TAM
+    if (stationName == firstForwardStation && !startedForward) {
       currentDirection = "forward";
-      hasForwardData = true;
-    } else if (stationName == firstBackwardStation &&
-        // nesmíme přepnout na backward, pokud jsme u NEMOCNICE v rámci směru TAM
-        currentDirection != "forward") {
-      if (hasBackwardData &&
-          times.first.startsWith("4:") &&
-          dayIndexBackward < 2) {
-        dayIndexBackward++;
-      }
+      currentDay = 0;
+      startedForward = true;
+    }
+
+    // 2) ZAČÁTEK SMĚRU ZPĚT
+    if (stationName == firstBackwardStation && startedForward && !startedBackward) {
       currentDirection = "backward";
-      hasBackwardData = true;
+      currentDay = 0;
+      startedBackward = true;
     }
 
     if (currentDirection == null) continue;
 
-    final directions = output["directions"] as Map<String, dynamic>;
-    final directionMap =
-    directions[currentDirection] as Map<String, Map<String, List<String>>>;
+    // 3) PŘEPNUTÍ DNE — pouze když jsme na první stanici směru
+    if ((stationName == firstForwardStation && currentDirection == "forward") ||
+        (stationName == firstBackwardStation && currentDirection == "backward")) {
+      if (times.first.startsWith("4:") && currentDay < 2) {
+        currentDay++;
+      }
+    }
 
-    final day = currentDirection == "forward"
-        ? dayName(dayIndexForward)
-        : dayName(dayIndexBackward);
+    final directionMap =
+    output["directions"][currentDirection] as Map<String, Map<String, List<String>>>;
 
     directionMap.putIfAbsent(stationName, () => {
       "weekday": <String>[],
@@ -87,43 +80,11 @@ Future<void> main() async {
       "sunday": <String>[],
     });
 
-    directionMap[stationName]![day]!.addAll(times);
+    directionMap[stationName]![dayName(currentDay)]!.addAll(times);
   }
 
-  final directions = output["directions"] as Map<String, dynamic>;
-  final forwardMap =
-  directions["forward"] as Map<String, Map<String, List<String>>>;
-  final backwardMap =
-  directions["backward"] as Map<String, Map<String, List<String>>>;
-
-  final forwardList = forwardMap.entries
-      .map((e) => {
-    "station": e.key,
-    "weekday": e.value["weekday"],
-    "saturday": e.value["saturday"],
-    "sunday": e.value["sunday"],
-  })
-      .toList();
-
-  final backwardList = backwardMap.entries
-      .map((e) => {
-    "station": e.key,
-    "weekday": e.value["weekday"],
-    "saturday": e.value["saturday"],
-    "sunday": e.value["sunday"],
-  })
-      .toList();
-
-  final finalOutput = {
-    "line": "A",
-    "directions": {
-      "forward": forwardList,
-      "backward": backwardList,
-    }
-  };
-
   final outFile = File('json/A.json');
-  outFile.writeAsStringSync(JsonEncoder.withIndent('  ').convert(finalOutput));
+  outFile.writeAsStringSync(JsonEncoder.withIndent('  ').convert(output));
 
   print("JSON saved to json/A.json");
 }
