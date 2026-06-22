@@ -1,4 +1,4 @@
-name: Parse Metro Timetables (new)
+name: Parse Metro Timetables (A, B, C)
 
 on:
   push:
@@ -18,27 +18,40 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y poppler-utils
 
-      - name: Convert PDF to text (layout preserved)
+      - name: Convert PDFs to text (A, B, C by prefix)
         run: |
-          echo "PDF files in repo:"
-          ls -l pdf
           mkdir -p ocr
-          rm -f ocr/output.txt
+          rm -f ocr/A.txt ocr/B.txt ocr/C.txt
+
           for f in pdf/*.pdf; do
-            echo "Processing $f"
-            pdftotext -layout "$f" "ocr/output.txt"
+            base=$(basename "$f")
+            prefix=${base:0:1}
+            upper=$(echo "$prefix" | tr '[:lower:]' '[:upper:]')
+
+            if [ "$upper" = "A" ] || [ "$upper" = "B" ] || [ "$upper" = "C" ]; then
+              echo "Converting $f → ocr/$upper.txt"
+              pdftotext -layout "$f" "ocr/$upper.txt"
+            else
+              echo "Skipping $f (unknown prefix)"
+            fi
           done
 
       - name: Install Dart SDK
         uses: dart-lang/setup-dart@v1
 
-      - name: Run Dart parser
-        run: dart run parser/parser.dart
+      - name: Run Dart parser for A
+        run: dart run parser/parser.dart A
+
+      - name: Run Dart parser for B
+        run: dart run parser/parser.dart B
+
+      - name: Run Dart parser for C
+        run: dart run parser/parser.dart C
 
       - name: Commit results
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "actions@github.com"
-          git add json/ ocr/output.txt
+          git add json/ ocr/
           git commit -m "Update parsed timetables" || echo "No changes to commit"
           git push
