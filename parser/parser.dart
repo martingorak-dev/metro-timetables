@@ -22,6 +22,35 @@ String normalize(String s) {
       .trim();
 }
 
+// ---------------------------------------------------------
+// NOVÉ FUNKCE – BEZ ZÁSAHU DO TVÉ LOGIKY PARSERU
+// ---------------------------------------------------------
+
+int toMinutes(String hhmm) {
+  final parts = hhmm.split(':');
+  return int.parse(parts[0]) * 60 + int.parse(parts[1]);
+}
+
+String fromMinutes(int m) {
+  final h = (m ~/ 60).toString().padLeft(2, '0');
+  final mm = (m % 60).toString().padLeft(2, '0');
+  return "$h:$mm";
+}
+
+/// dopočítá časy mezi start a end po intervalu X minut
+List<String> fillInterval(String start, String end, int interval) {
+  final s = toMinutes(start);
+  final e = toMinutes(end);
+  final out = <String>[];
+
+  int t = s + interval;
+  while (t < e) {
+    out.add(fromMinutes(t));
+    t += interval;
+  }
+  return out;
+}
+
 // -------------------------------
 // PARSER PRO JEDNU LINKU
 // -------------------------------
@@ -43,6 +72,11 @@ Map<String, dynamic> parseLine(
   final normalizedStations = stations.map(normalize).toList();
 
   final timeRegex = RegExp(r'\b\d{1,2}:\d{2}\b');
+
+  // ---------------------------------------------------------
+  // NOVÝ REGEX NA INTERVALOVÉ TABULKY (NIC JINÉHO NEMĚNÍM)
+  // ---------------------------------------------------------
+  final intervalRegex = RegExp(r'int\.\s*(\d+)\s*min');
 
   final result = {
     "line": lineName,
@@ -83,6 +117,58 @@ Map<String, dynamic> parseLine(
     while (i < normalizedLines.length) {
       final normLine = normalizedLines[i];
 
+      // ---------------------------------------------------------
+      // DETEKCE INTERVALOVÉ TABULKY (int. X min.)
+      // ---------------------------------------------------------
+      final intervalMatch = intervalRegex.firstMatch(normLine);
+      if (intervalMatch != null) {
+        final interval = int.parse(intervalMatch.group(1)!);
+
+        // najít poslední čas před intervalem
+        String? lastBefore;
+        for (int k = i - 1; k >= 0; k--) {
+          final prevTimes = timeRegex
+              .allMatches(lines[k])
+              .map((m) => m.group(0)!)
+              .toList();
+          if (prevTimes.isNotEmpty) {
+            lastBefore = prevTimes.last;
+            break;
+          }
+        }
+
+        // najít první čas po intervalu
+        String? firstAfter;
+        for (int k = i + 1; k < normalizedLines.length; k++) {
+          final nextTimes = timeRegex
+              .allMatches(lines[k])
+              .map((m) => m.group(0)!)
+              .toList();
+          if (nextTimes.isNotEmpty) {
+            firstAfter = nextTimes.first;
+            break;
+          }
+        }
+
+        if (lastBefore != null && firstAfter != null) {
+          final filled = fillInterval(lastBefore, firstAfter, interval);
+
+          // přidáme dopočítané časy do aktuálního dne/směru
+          if (direction == "forward") {
+            if (dayIndex == 0) forward["weekday"]!.addAll(filled);
+            if (dayIndex == 1) forward["saturday"]!.addAll(filled);
+            if (dayIndex == 2) forward["sunday"]!.addAll(filled);
+          } else {
+            if (dayIndex == 0) backward["weekday"]!.addAll(filled);
+            if (dayIndex == 1) backward["saturday"]!.addAll(filled);
+            if (dayIndex == 2) backward["sunday"]!.addAll(filled);
+          }
+        }
+
+        i++;
+        continue;
+      }
+
       if (!normLine.contains(normalizedStation)) {
         i++;
         continue;
@@ -93,7 +179,6 @@ Map<String, dynamic> parseLine(
         i++;
         continue;
       }
-
 
       // 1) časy z řádku se stanicí
       List<String> times = timeRegex
@@ -121,7 +206,7 @@ Map<String, dynamic> parseLine(
           continue;
         }
 
-// bereme jen odjezdy nebo řádky bez textu prij/odj
+        // bereme jen odjezdy nebo řádky bez textu prij/odj
         final extraTimes = timeRegex
             .allMatches(lines[j])
             .map((m) => m.group(0)!)
