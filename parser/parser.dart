@@ -23,7 +23,7 @@ String normalize(String s) {
 }
 
 // ---------------------------------------------------------
-// NOVÉ FUNKCE – BEZ ZÁSAHU DO TVÉ LOGIKY PARSERU
+// Pomocné funkce pro práci s časy
 // ---------------------------------------------------------
 
 int toMinutes(String hhmm) {
@@ -52,7 +52,7 @@ List<String> fillInterval(String start, String end, int interval) {
 }
 
 // -------------------------------
-// PARSER PRO JEDNU LINKU
+// PARSER PRO JEDNU LINKU – 2.0
 // -------------------------------
 Map<String, dynamic> parseLine(
     String lineName,
@@ -62,7 +62,7 @@ Map<String, dynamic> parseLine(
   final input = File(inputPath);
   if (!input.existsSync()) {
     print("Skipping $lineName – no TXT file found.");
-    return {}; // nic nevytváříme
+    return {};
   }
 
   print("Parsing line $lineName from $inputPath");
@@ -73,10 +73,10 @@ Map<String, dynamic> parseLine(
 
   final timeRegex = RegExp(r'\b\d{1,2}:\d{2}\b');
 
-  // ---------------------------------------------------------
-  // NOVÝ REGEX NA INTERVALOVÉ TABULKY (NIC JINÉHO NEMĚNÍM)
-  // ---------------------------------------------------------
-  final intervalRegex = RegExp(r'int\.\s*(\d+)\s*min');
+  // intervalová tabulka: "int." ... číslo ... "min."
+  final intMarkerRegex = RegExp(r'\bint\.', caseSensitive: false);
+  final minMarkerRegex = RegExp(r'\bmin\.', caseSensitive: false);
+  final numberRegex = RegExp(r'\b(\d{1,2})\b');
 
   final result = {
     "line": lineName,
@@ -88,7 +88,7 @@ Map<String, dynamic> parseLine(
   bool isDayStart(String t) =>
       t.startsWith("3:") || t.startsWith("4:") || t.startsWith("5:");
 
-  // PRO KAŽDOU STANICI ZVLÁŠŤ
+  // PRO KAŽDOU STANICI ZVLÁŠŤ (varianta B – řádek obsahující název = začátek stanice)
   for (int s = 0; s < stations.length; s++) {
     final station = stations[s];
     final normalizedStation = normalizedStations[s];
@@ -118,50 +118,73 @@ Map<String, dynamic> parseLine(
       final normLine = normalizedLines[i];
 
       // ---------------------------------------------------------
-      // DETEKCE INTERVALOVÉ TABULKY (int. X min.)
+      // DETEKCE INTERVALOVÉ TABULKY (int. ... číslo ... min.)
       // ---------------------------------------------------------
-      final intervalMatch = intervalRegex.firstMatch(normLine);
-      if (intervalMatch != null) {
-        final interval = int.parse(intervalMatch.group(1)!);
+      if (intMarkerRegex.hasMatch(normLine)) {
+        int? intervalMinutes;
 
-        // najít poslední čas před intervalem
-        String? lastBefore;
-        for (int k = i - 1; k >= 0; k--) {
-          final prevTimes = timeRegex
-              .allMatches(lines[k])
-              .map((m) => m.group(0)!)
-              .toList();
-          if (prevTimes.isNotEmpty) {
-            lastBefore = prevTimes.last;
-            break;
-          }
-        }
-
-        // najít první čas po intervalu
-        String? firstAfter;
+        // najít řádek s "min."
+        int? minIndex;
         for (int k = i + 1; k < normalizedLines.length; k++) {
-          final nextTimes = timeRegex
-              .allMatches(lines[k])
-              .map((m) => m.group(0)!)
-              .toList();
-          if (nextTimes.isNotEmpty) {
-            firstAfter = nextTimes.first;
+          if (minMarkerRegex.hasMatch(normalizedLines[k])) {
+            minIndex = k;
             break;
           }
         }
 
-        if (lastBefore != null && firstAfter != null) {
-          final filled = fillInterval(lastBefore, firstAfter, interval);
+        if (minIndex != null) {
+          // mezi "int." a "min." najít číslo intervalu (typicky na řádku se stanicí)
+          for (int k = i + 1; k <= minIndex; k++) {
+            final matches = numberRegex.allMatches(normalizedLines[k]).toList();
+            if (matches.isNotEmpty) {
+              final m = matches.last.group(1)!;
+              intervalMinutes = int.tryParse(m);
+              if (intervalMinutes != null) break;
+            }
+          }
+        }
 
-          // přidáme dopočítané časy do aktuálního dne/směru
-          if (direction == "forward") {
-            if (dayIndex == 0) forward["weekday"]!.addAll(filled);
-            if (dayIndex == 1) forward["saturday"]!.addAll(filled);
-            if (dayIndex == 2) forward["sunday"]!.addAll(filled);
-          } else {
-            if (dayIndex == 0) backward["weekday"]!.addAll(filled);
-            if (dayIndex == 1) backward["saturday"]!.addAll(filled);
-            if (dayIndex == 2) backward["sunday"]!.addAll(filled);
+        if (intervalMinutes != null) {
+          // najít poslední čas před "int."
+          String? lastBefore;
+          for (int k = i - 1; k >= 0; k--) {
+            final prevTimes = timeRegex
+                .allMatches(lines[k])
+                .map((m) => m.group(0)!)
+                .toList();
+            if (prevTimes.isNotEmpty) {
+              lastBefore = prevTimes.last;
+              break;
+            }
+          }
+
+          // najít první čas po "min."
+          String? firstAfter;
+          if (minIndex != null) {
+            for (int k = minIndex + 1; k < normalizedLines.length; k++) {
+              final nextTimes = timeRegex
+                  .allMatches(lines[k])
+                  .map((m) => m.group(0)!)
+                  .toList();
+              if (nextTimes.isNotEmpty) {
+                firstAfter = nextTimes.first;
+                break;
+              }
+            }
+          }
+
+          if (lastBefore != null && firstAfter != null) {
+            final filled = fillInterval(lastBefore, firstAfter, intervalMinutes);
+
+            if (direction == "forward") {
+              if (dayIndex == 0) forward["weekday"]!.addAll(filled);
+              if (dayIndex == 1) forward["saturday"]!.addAll(filled);
+              if (dayIndex == 2) forward["sunday"]!.addAll(filled);
+            } else {
+              if (dayIndex == 0) backward["weekday"]!.addAll(filled);
+              if (dayIndex == 1) backward["saturday"]!.addAll(filled);
+              if (dayIndex == 2) backward["sunday"]!.addAll(filled);
+            }
           }
         }
 
@@ -169,12 +192,13 @@ Map<String, dynamic> parseLine(
         continue;
       }
 
+      // řádek neobsahuje tuto stanici → ignorujeme
       if (!normLine.contains(normalizedStation)) {
         i++;
         continue;
       }
 
-      // ignorujeme příjezdy i na hlavním řádku
+      // ignorujeme příjezdy
       if (normLine.contains("prij")) {
         i++;
         continue;
@@ -186,9 +210,7 @@ Map<String, dynamic> parseLine(
           .map((m) => m.group(0)!)
           .toList();
 
-      // ---------------------------------------------------------
-      // 2) připojit rozsekané řádky + detekce mezer a intervalů
-      // ---------------------------------------------------------
+      // 2) připojit rozsekané řádky pod stanicí (bez jiných stanic)
       int j = i + 1;
       while (j < normalizedLines.length) {
         final nextNorm = normalizedLines[j];
@@ -214,50 +236,8 @@ Map<String, dynamic> parseLine(
 
         if (extraTimes.isNotEmpty) {
           times.addAll(extraTimes);
-          j++;
-          continue;
         }
 
-        // -------------------------
-        // MEZERA → interval?
-        // -------------------------
-        if (j + 2 < normalizedLines.length &&
-            normalizedLines[j].contains("int") &&
-            RegExp(r'^\d+$').hasMatch(normalizedLines[j + 1]) &&
-            normalizedLines[j + 2].contains("min")) {
-
-          final interval = int.parse(normalizedLines[j + 1]);
-
-          int k = j + 3;
-          List<String> afterTimes = [];
-          while (k < normalizedLines.length) {
-            final t = timeRegex
-                .allMatches(lines[k])
-                .map((m) => m.group(0)!)
-                .toList();
-            if (t.isNotEmpty) {
-              afterTimes = t;
-              break;
-            }
-            k++;
-          }
-
-          if (afterTimes.isNotEmpty) {
-            final lastBefore = times.last;
-            final firstAfter = afterTimes.first;
-
-            final filled = fillInterval(lastBefore, firstAfter, interval);
-
-            times.addAll(filled);
-          }
-
-          j += 3;
-          continue;
-        }
-
-        // -------------------------
-        // MEZERA, ale není interval
-        // -------------------------
         j++;
       }
 
@@ -383,10 +363,13 @@ Future<void> main(List<String> args) async {
 
   late List<String> stations;
 
-  if (line == "A") stations = stationsA;
-  else if (line == "B") stations = stationsB;
-  else if (line == "C") stations = stationsC;
-  else {
+  if (line == "A") {
+    stations = stationsA;
+  } else if (line == "B") {
+    stations = stationsB;
+  } else if (line == "C") {
+    stations = stationsC;
+  } else {
     print("Unknown line: $line");
     return;
   }
