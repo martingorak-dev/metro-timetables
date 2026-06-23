@@ -38,27 +38,13 @@ jobs:
       - name: Install Dart SDK
         uses: dart-lang/setup-dart@v1
 
-      # - name: Compare TXT and run parser only if changed
-      #   run: |
-      #     for line in A B C; do
-      #       if [ -f "ocr_new/$line.txt" ]; then
-      #         if ! cmp -s "ocr_new/$line.txt" "ocr/$line.txt"; then
-      #           echo "TXT for $line changed → updating"
-      #           mv "ocr_new/$line.txt" "ocr/$line.txt"
-      #           dart run parser/parser.dart $line
-      #         else
-      #           echo "TXT for $line unchanged → skipping"
-      #         fi
-      #       fi
-      #     done
-
       - name: Always update TXT and run parser
         run: |
           mkdir -p ocr
           for line in A B C; do
             if [ -f "ocr_new/$line.txt" ]; then
               echo "Updating TXT for $line"
-              cp "ocr_new/$line.txt" "ocr/$line.txt"
+              cp --no-preserve=mode,ownership,timestamps "ocr_new/$line.txt" "ocr/$line.txt"
               echo "Running parser for $line"
               dart run parser/parser.dart $line
             else
@@ -70,6 +56,6 @@ jobs:
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "actions@github.com"
-          git add json/ ocr/
+          git add json/ ocr/ ocr_new/
           git commit -m "Update parsed timetables" || echo "No changes to commit"
           git push
