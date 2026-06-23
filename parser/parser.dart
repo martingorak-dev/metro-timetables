@@ -186,7 +186,9 @@ Map<String, dynamic> parseLine(
           .map((m) => m.group(0)!)
           .toList();
 
-      // 2) připojit rozsekané řádky (int. 10, pokračování řádku)
+      // ---------------------------------------------------------
+      // 2) připojit rozsekané řádky + detekce mezer a intervalů
+      // ---------------------------------------------------------
       int j = i + 1;
       while (j < normalizedLines.length) {
         final nextNorm = normalizedLines[j];
@@ -200,13 +202,11 @@ Map<String, dynamic> parseLine(
         }
         if (containsOtherStation) break;
 
-        // ignorujeme příjezdy
         if (nextNorm.contains("prij")) {
           j++;
           continue;
         }
 
-        // bereme jen odjezdy nebo řádky bez textu prij/odj
         final extraTimes = timeRegex
             .allMatches(lines[j])
             .map((m) => m.group(0)!)
@@ -214,8 +214,50 @@ Map<String, dynamic> parseLine(
 
         if (extraTimes.isNotEmpty) {
           times.addAll(extraTimes);
+          j++;
+          continue;
         }
 
+        // -------------------------
+        // MEZERA → interval?
+        // -------------------------
+        if (j + 2 < normalizedLines.length &&
+            normalizedLines[j].contains("int") &&
+            RegExp(r'^\d+$').hasMatch(normalizedLines[j + 1]) &&
+            normalizedLines[j + 2].contains("min")) {
+
+          final interval = int.parse(normalizedLines[j + 1]);
+
+          int k = j + 3;
+          List<String> afterTimes = [];
+          while (k < normalizedLines.length) {
+            final t = timeRegex
+                .allMatches(lines[k])
+                .map((m) => m.group(0)!)
+                .toList();
+            if (t.isNotEmpty) {
+              afterTimes = t;
+              break;
+            }
+            k++;
+          }
+
+          if (afterTimes.isNotEmpty) {
+            final lastBefore = times.last;
+            final firstAfter = afterTimes.first;
+
+            final filled = fillInterval(lastBefore, firstAfter, interval);
+
+            times.addAll(filled);
+          }
+
+          j += 3;
+          continue;
+        }
+
+        // -------------------------
+        // MEZERA, ale není interval
+        // -------------------------
         j++;
       }
 
@@ -270,7 +312,6 @@ Future<void> main(List<String> args) async {
   final inputPath = "ocr/$line.txt";
   final outputPath = "json/$line.json";
 
-  // Seznamy stanic
   const stationsA = [
     "DEPO HOSTIVAŘ",
     "Skalka",
