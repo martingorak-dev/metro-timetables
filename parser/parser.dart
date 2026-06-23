@@ -88,6 +88,13 @@ Map<String, dynamic> parseLine(
         continue;
       }
 
+      // ignorujeme příjezdy i na hlavním řádku
+      if (normLine.contains("prij")) {
+        i++;
+        continue;
+      }
+
+
       // 1) časy z řádku se stanicí
       List<String> times = timeRegex
           .allMatches(lines[i])
