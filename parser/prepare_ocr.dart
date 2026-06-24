@@ -33,11 +33,6 @@ Future<void> main(List<String> args) async {
     "Pracovní den",
     "jede v pracovních dnech",
     "Sokolovská 42/217",
-    "A",
-    "sobota",
-    "neděle",
-    "jede v",
-    "jízdní řád",
   ];
 
   final cleaned = <String>[];
