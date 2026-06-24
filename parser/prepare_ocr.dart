@@ -18,57 +18,42 @@ Future<void> main(List<String> args) async {
 
   final lines = input.readAsLinesSync();
 
-  // 1) Zahodíme prvních 6 řádků
-  const skipLines = 6;
-
-  // 2) Odstraníme prvních 18 znaků
-  const cutChars = 10;
-
-  // 3) Zakázané texty (hlavičky/patičky PDF)
-  final banned = [
-    "dopravní podnik",
-    "pokračování",
-    "pracovní den",
+  // Přesné fráze, které mají být odstraněny
+  final bannedPhrases = [
+    "DH - NM",
+    "NM - DH",
+    "Depo Hostivař – Nemocnice Motol",
+    "Nemocnice Motol – Depo Hostivař",
+    "Depo Hostivař - Nemocnice Motol",
+    "Nemocnice Motol - Depo Hostivař",
+    "Dopravní podnik",
+    "Pokračování",
+    "Vysvětlivky",
+    "Legenda",
+    "Metro A",
+    "Strana",
+    "Pracovní den",
     "jede v pracovních dnech",
-    "vysvětlivky",
-    "legenda",
-    "metro",
-    "strana",
-    "depo hostivař – nemocnice motol",
-    "nemocnice motol – depo hostivař",
   ];
 
   final cleaned = <String>[];
 
-  for (int i = 0; i < lines.length; i++) {
-    if (i < skipLines) continue;
-
-    var lineText = lines[i];
-
-    // Ořez prvních 18 znaků
-    if (lineText.length > cutChars) {
-      lineText = lineText.substring(cutChars);
-    } else {
-      lineText = "";
-    }
-
+  for (final lineText in lines) {
     final lower = lineText.toLowerCase();
 
-    // Pokud řádek obsahuje zakázané slovo → přeskočit
     bool skip = false;
-    for (final bad in banned) {
-      if (lower.contains(bad)) {
+    for (final phrase in bannedPhrases) {
+      if (lower.contains(phrase.toLowerCase())) {
         skip = true;
         break;
       }
     }
-    if (skip) continue;
 
-    cleaned.add(lineText);
+    if (!skip) cleaned.add(lineText);
   }
 
   Directory("ocr_priprava").createSync(recursive: true);
   File(outputPath).writeAsStringSync(cleaned.join("\n"));
 
-  print("KROK 2 hotový → $outputPath");
+  print("Hotovo → $outputPath");
 }
