@@ -19,6 +19,12 @@ String? extractInterval(String line) {
   return m?.group(1);
 }
 
+class TimePos {
+  final int pos;
+  final String value;
+  TimePos(this.pos, this.value);
+}
+
 Future<void> main(List<String> args) async {
   if (args.isEmpty) {
     print("Použití: dart run parser/prepare_ocr.dart A");
@@ -113,62 +119,131 @@ Future<void> main(List<String> args) async {
   }
 
   // -------------------------------
-  // 2) Zpracování bloků → sloupce
+  // 2) Zpracování bloků → mřížka sloupců
   // -------------------------------
-  Map<String, List<String>> tam = {for (var s in stations) s: []};
-  Map<String, List<String>> zpet = {for (var s in stations.reversed) s: []};
+  Map<String, List<String>> processDirectionBlocks(
+      List<List<String>> blocks,
+      List<String> stationOrder,
+      ) {
+    // Výsledek pro všechny bloky slepené za sebe
+    final result = {for (var s in stationOrder) s: <String>[]};
 
-  // Extrakce sloupců podle pozice
-  List<String> extractColumns(String line) {
-    final matches = timeRegex.allMatches(line).toList();
-    if (matches.isEmpty) return [];
+    const posThreshold = 3; // tolerance v pozici znaků
+    const emptyToken = "-----";
 
-    List<String> cols = [];
-    int lastEnd = 0;
-
-    for (final m in matches) {
-      final start = m.start;
-
-      // Pokud je mezi časy velká mezera → prázdný sloupec
-      if (start - lastEnd > 6) {
-        cols.add("-----");
-      }
-
-      cols.add(m.group(0)!);
-      lastEnd = m.end;
-    }
-
-    return cols;
-  }
-
-  void processBlocks(List<List<String>> blocks, Map<String, List<String>> target) {
     for (final block in blocks) {
-      for (final st in target.keys) {
-        final stNorm = norm(st);
+      // 1) Nasbíráme časy s pozicemi pro všechny stanice v bloku
+      final Map<String, List<TimePos>> stationTimes = {
+        for (var s in stationOrder) s: []
+      };
 
-        // Najdeme řádky stanice
-        final stationLines = block.where((l) => norm(l).contains(stNorm)).toList();
+      String? currentStation;
 
-        if (stationLines.isEmpty) continue;
+      for (final line in block) {
+        final ln = norm(line);
 
-        // Sloupce z prvního řádku
-        final cols = extractColumns(stationLines.first);
-
-        // Intervaly
-        for (final l in stationLines) {
-          if (isIntervalLine(l)) {
-            final x = extractInterval(l);
-            if (x != null) cols.add("INT $x");
+        // Detekce stanice na řádku
+        for (int i = 0; i < stationOrder.length; i++) {
+          if (ln.contains(stationsNorm[i])) {
+            currentStation = stationOrder[i];
+            break;
           }
         }
 
-        target[st]!.addAll(cols);
+        if (currentStation == null) continue;
+
+        // Časy na řádku
+        for (final m in timeRegex.allMatches(line)) {
+          stationTimes[currentStation]!.add(TimePos(m.start, m.group(0)!));
+        }
+      }
+
+      // 2) Vytvoříme seznam všech pozic (mřížka sloupců)
+      final List<int> allPositions = [];
+      stationTimes.values.forEach((list) {
+        for (final tp in list) {
+          allPositions.add(tp.pos);
+        }
+      });
+
+      if (allPositions.isEmpty) {
+        // blok bez časů – přeskočíme
+        continue;
+      }
+
+      allPositions.sort();
+
+      // Sloučíme blízké pozice do jednoho sloupce
+      final List<int> columnPositions = [];
+      int groupStart = allPositions.first;
+      int groupSum = allPositions.first;
+      int groupCount = 1;
+
+      for (int i = 1; i < allPositions.length; i++) {
+        final p = allPositions[i];
+        if (p - groupStart <= posThreshold) {
+          groupSum += p;
+          groupCount++;
+        } else {
+          columnPositions.add(groupSum ~/ groupCount);
+          groupStart = p;
+          groupSum = p;
+          groupCount = 1;
+        }
+      }
+      columnPositions.add(groupSum ~/ groupCount);
+
+      // 3) Interval pro blok (pokud existuje)
+      String? blockInterval;
+      for (final line in block) {
+        if (isIntervalLine(line)) {
+          final x = extractInterval(line);
+          if (x != null) {
+            blockInterval = "INT $x";
+            break;
+          }
+        }
+      }
+
+      // 4) Pro každou stanici naplníme sloupce
+      for (final st in stationOrder) {
+        final cols = <String>[];
+        final times = stationTimes[st]!;
+
+        for (final colPos in columnPositions) {
+          // najdeme čas nejblíž tomuto sloupci
+          TimePos? best;
+          int bestDist = 1 << 30;
+
+          for (final tp in times) {
+            final d = (tp.pos - colPos).abs();
+            if (d < bestDist && d <= posThreshold) {
+              bestDist = d;
+              best = tp;
+            }
+          }
+
+          if (best != null) {
+            cols.add(best.value);
+          } else {
+            cols.add(emptyToken);
+          }
+        }
+
+        // Interval jako extra sloupec na konci bloku
+        if (blockInterval != null) {
+          cols.add(blockInterval);
+        }
+
+        result[st]!.addAll(cols);
       }
     }
+
+    return result;
   }
 
-  processBlocks(tamBlocks, tam);
-  processBlocks(zpetBlocks, zpet);
+  final tam = processDirectionBlocks(tamBlocks, stations);
+  final zpet = processDirectionBlocks(zpetBlocks, stations.reversed.toList());
 
   // -------------------------------
   // 3) Zarovnání sloupců
