@@ -1,13 +1,22 @@
 import 'dart:io';
 
-// Normalizace pro porovnávání
+// Normalizace textu pro porovnávání
 String norm(String s) =>
     s.toLowerCase().replaceAll(RegExp(r'\s+'), ' ').trim();
 
-// Zjistí, zda řádek obsahuje název stanice
-bool containsStation(String line, List<String> stationsNorm) {
+// Regex pro čas
+final timeRegex = RegExp(r'\b\d{1,2}:\d{2}\b');
+
+// Detekce intervalu
+bool isIntervalLine(String line) {
   final n = norm(line);
-  return stationsNorm.any((s) => n.contains(s));
+  return n.contains("int") || n.contains("min") || RegExp(r'^\d+$').hasMatch(n);
+}
+
+// Extrakce čísla intervalu
+String? extractInterval(String line) {
+  final m = RegExp(r'\b(\d{1,2})\b').firstMatch(line);
+  return m?.group(1);
 }
 
 Future<void> main(List<String> args) async {
@@ -20,7 +29,7 @@ Future<void> main(List<String> args) async {
   final inputPath = "ocr/$line.txt";
   final outputPath = "ocr_priprava/$line.txt";
 
-  // Seznam stanic pro linku A
+  // Stanice linky A
   const stationsA = [
     "DEPO HOSTIVAŘ",
     "Skalka",
@@ -40,7 +49,6 @@ Future<void> main(List<String> args) async {
     "NEMOCNICE MOTOL"
   ];
 
-  // TODO: doplnit B a C
   final stations = stationsA;
   final stationsNorm = stations.map(norm).toList();
 
@@ -53,84 +61,118 @@ Future<void> main(List<String> args) async {
   final lines = input.readAsLinesSync();
 
   // -------------------------------
-  // 1) Najdeme bloky podle první a poslední stanice
+  // 1) Najdeme bloky TAM a ZPĚT
   // -------------------------------
-  final firstStationNorm = norm(stations.first);
-  final lastStationNorm = norm(stations.last);
+  List<List<String>> tamBlocks = [];
+  List<List<String>> zpetBlocks = [];
 
-  List<List<String>> blocks = [];
   List<String> current = [];
+  bool inTam = false;
+  bool inZpet = false;
 
   for (final line in lines) {
     final n = norm(line);
 
-    // Začátek bloku
-    if (n.contains(firstStationNorm)) {
+    // Začátek TAM bloku
+    if (n.contains(norm(stations.first))) {
       if (current.isNotEmpty) {
-        blocks.add(current);
-        current = [];
+        if (inTam) tamBlocks.add(current);
+        if (inZpet) zpetBlocks.add(current);
       }
+      current = [];
+      inTam = true;
+      inZpet = false;
+    }
+
+    // Začátek ZPĚT bloku
+    if (n.contains(norm(stations.last))) {
+      if (current.isNotEmpty) {
+        if (inTam) tamBlocks.add(current);
+        if (inZpet) zpetBlocks.add(current);
+      }
+      current = [];
+      inTam = false;
+      inZpet = true;
     }
 
     current.add(line);
 
-    // Konec bloku
-    if (n.contains(lastStationNorm)) {
-      blocks.add(current);
+    // Konec TAM bloku
+    if (inTam && n.contains(norm(stations.last))) {
+      tamBlocks.add(current);
       current = [];
+      inTam = false;
+    }
+
+    // Konec ZPĚT bloku
+    if (inZpet && n.contains(norm(stations.first))) {
+      zpetBlocks.add(current);
+      current = [];
+      inZpet = false;
     }
   }
 
   // -------------------------------
-  // 2) Poskládáme bloky vedle sebe
+  // 2) Zpracujeme bloky → stanice → časy
   // -------------------------------
-  // Výstupní struktura:
-  // stanice → seznam všech časů z bloků
-  final Map<String, List<String>> tam = {};
-  final Map<String, List<String>> zpet = {};
+  Map<String, List<String>> tam = {for (var s in stations) s: []};
+  Map<String, List<String>> zpet = {for (var s in stations.reversed) s: []};
 
-  for (final st in stations) {
-    tam[st] = [];
-    zpet[st] = [];
-  }
+  void processBlocks(List<List<String>> blocks, Map<String, List<String>> target) {
+    for (final block in blocks) {
+      for (final st in target.keys) {
+        final stNorm = norm(st);
 
-  for (final block in blocks) {
-    for (final line in block) {
-      final n = norm(line);
+        // Najdeme řádky patřící ke stanici
+        final stationLines = block.where((l) => norm(l).contains(stNorm)).toList();
 
-      // najdeme stanici
-      for (int i = 0; i < stations.length; i++) {
-        final st = stations[i];
-        if (n.contains(norm(st))) {
-          // extrahujeme časy
-          final times = RegExp(r'\b\d{1,2}:\d{2}\b')
-              .allMatches(line)
-              .map((m) => m.group(0)!)
-              .toList();
+        // Extrahujeme časy
+        for (final l in stationLines) {
+          final times = timeRegex.allMatches(l).map((m) => m.group(0)!).toList();
+          target[st]!.addAll(times);
 
-          // směr TAM = stanice v normálním pořadí
-          // směr ZPĚT = stanice v opačném pořadí
-          tam[st]!.addAll(times);
-          zpet[stations[stations.length - 1 - i]]!.addAll(times);
+          // Intervaly
+          if (isIntervalLine(l)) {
+            final x = extractInterval(l);
+            if (x != null) target[st]!.add("INT $x");
+          }
         }
       }
     }
   }
 
+  processBlocks(tamBlocks, tam);
+  processBlocks(zpetBlocks, zpet);
+
   // -------------------------------
-  // 3) Uložíme výsledek
+  // 3) Zarovnání sloupců
+  // -------------------------------
+  const timeWidth = 5; // např. "4:43 "
+  const intWidth = 6;  // "INT 10"
+
+  String padTime(String t) {
+    if (t.startsWith("INT")) {
+      return t.padRight(intWidth);
+    }
+    return t.padRight(timeWidth);
+  }
+
+  // -------------------------------
+  // 4) Uložíme výsledek
   // -------------------------------
   final out = StringBuffer();
 
   out.writeln("[TAM]");
   for (final st in stations) {
-    out.writeln("$st | ${tam[st]!.join(' ')}");
+    final padded = tam[st]!.map(padTime).join("    "); // 4 mezery
+    out.writeln("${st.padRight(20)} | $padded");
   }
 
   out.writeln("");
   out.writeln("[ZPET]");
   for (final st in stations.reversed) {
-    out.writeln("$st | ${zpet[st]!.join(' ')}");
+    final padded = zpet[st]!.map(padTime).join("    ");
+    out.writeln("${st.padRight(20)} | $padded");
   }
 
   Directory("ocr_priprava").createSync(recursive: true);
