@@ -18,8 +18,12 @@ Future<void> main(List<String> args) async {
 
   final lines = input.readAsLinesSync();
 
-  // 1) zahodíme prvních 6 řádků
+  // 1) Zahodíme prvních 6 řádků
   const skipLines = 6;
+
+  // 2) Odstraníme prvních 18 znaků z každého dalšího řádku
+  const cutChars = 18;
+
   final cleaned = <String>[];
 
   for (int i = 0; i < lines.length; i++) {
@@ -27,9 +31,8 @@ Future<void> main(List<String> args) async {
 
     var lineText = lines[i];
 
-    // 2) odstraníme prvních 4 znaků (sloupce), pokud existují
-    if (lineText.length > 4) {
-      lineText = lineText.substring(4);
+    if (lineText.length > cutChars) {
+      lineText = lineText.substring(cutChars);
     } else {
       lineText = "";
     }
@@ -40,5 +43,5 @@ Future<void> main(List<String> args) async {
   Directory("ocr_priprava").createSync(recursive: true);
   File(outputPath).writeAsStringSync(cleaned.join("\n"));
 
-  print("KROK 1 hotový → $outputPath");
+  print("KROK 1B hotový → $outputPath");
 }
