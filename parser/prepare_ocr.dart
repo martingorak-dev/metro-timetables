@@ -27,35 +27,33 @@ bool isStationLine(String line) {
   return stations.any((s) => lower.contains(s.toLowerCase()));
 }
 
-// Detekce intervalu i když je rozsekaný na 3 řádky
-int? detectInterval(List<String> block) {
-  for (int i = 0; i < block.length; i++) {
-    final l = block[i].toLowerCase();
+// Funkce pro nahrazení mezer pomlčkami mezi časy
+String replaceSpacesWithDashes(String line) {
+  final matches = timeRegex.allMatches(line).toList();
 
-    if (l.contains("int.")) {
-      // další řádek musí být číslo
-      if (i + 1 < block.length) {
-        final next = block[i + 1].trim();
-        final num = int.tryParse(next);
-        if (num != null) {
-          // další řádek musí obsahovat "min"
-          if (i + 2 < block.length &&
-              block[i + 2].toLowerCase().contains("min")) {
-            return num;
-          }
-        }
-      }
+  if (matches.isEmpty) {
+    // řádek bez časů → nahradíme všechny mezery
+    return line.replaceAll(' ', '-');
+  }
+
+  final chars = line.split('');
+
+  // 1) Od začátku řádku po první čas
+  for (int i = 0; i < matches.first.start; i++) {
+    if (chars[i] == ' ') chars[i] = '-';
+  }
+
+  // 2) Mezi jednotlivými časy
+  for (int i = 0; i < matches.length - 1; i++) {
+    final endOfThis = matches[i].end;
+    final startOfNext = matches[i + 1].start;
+
+    for (int j = endOfThis; j < startOfNext; j++) {
+      if (chars[j] == ' ') chars[j] = '-';
     }
   }
-  return null;
-}
 
-// Rozpoznání řádků, které patří k intervalu
-bool isIntervalLine(String l) {
-  final low = l.toLowerCase().trim();
-  if (low == "int." || low == "min.") return true;
-  if (int.tryParse(low) != null) return true;
-  return false;
+  return chars.join('');
 }
 
 Future<void> main(List<String> args) async {
@@ -132,32 +130,12 @@ Future<void> main(List<String> args) async {
   }
   if (current.isNotEmpty) blocks.add(current);
 
-  // 3) Zpracování intervalů v blocích
+  // 3) Nahrazení mezer pomlčkami v každém řádku
   final output = <String>[];
 
   for (final block in blocks) {
-    final interval = detectInterval(block);
-
     for (final l in block) {
-      // Smazat řádky patřící k intervalu
-      if (isIntervalLine(l)) continue;
-
-      if (interval != null) {
-        final times = timeRegex.allMatches(l).toList();
-
-        if (times.length >= 2) {
-          final firstEnd = times[0].end;
-          final secondStart = times[1].start;
-
-          final before = l.substring(0, firstEnd);
-          final after = l.substring(secondStart);
-
-          output.add("$before   INT $interval   $after");
-          continue;
-        }
-      }
-
-      output.add(l);
+      output.add(replaceSpacesWithDashes(l));
     }
   }
 
