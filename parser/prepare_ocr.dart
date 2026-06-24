@@ -1,7 +1,6 @@
 import 'dart:io';
 
 final timeRegex = RegExp(r'\b\d{1,2}:\d{2}\b');
-final intervalRegex = RegExp(r'int\.\s*(\d+)\s*min', caseSensitive: false);
 
 // Stanice linky A
 final stations = [
@@ -26,6 +25,37 @@ final stations = [
 bool isStationLine(String line) {
   final lower = line.toLowerCase();
   return stations.any((s) => lower.contains(s.toLowerCase()));
+}
+
+// Detekce intervalu i když je rozsekaný na 3 řádky
+int? detectInterval(List<String> block) {
+  for (int i = 0; i < block.length; i++) {
+    final l = block[i].toLowerCase();
+
+    if (l.contains("int.")) {
+      // další řádek musí být číslo
+      if (i + 1 < block.length) {
+        final next = block[i + 1].trim();
+        final num = int.tryParse(next);
+        if (num != null) {
+          // další řádek musí obsahovat "min"
+          if (i + 2 < block.length &&
+              block[i + 2].toLowerCase().contains("min")) {
+            return num;
+          }
+        }
+      }
+    }
+  }
+  return null;
+}
+
+// Rozpoznání řádků, které patří k intervalu
+bool isIntervalLine(String l) {
+  final low = l.toLowerCase().trim();
+  if (low == "int." || low == "min.") return true;
+  if (int.tryParse(low) != null) return true;
+  return false;
 }
 
 Future<void> main(List<String> args) async {
@@ -76,6 +106,7 @@ Future<void> main(List<String> args) async {
 
     bool skip = false;
 
+    // Smazat řádek, který obsahuje JEN "A"
     if (lineText.trim() == "A") skip = true;
 
     for (final phrase in bannedPhrases) {
@@ -105,20 +136,11 @@ Future<void> main(List<String> args) async {
   final output = <String>[];
 
   for (final block in blocks) {
-    int? interval;
-
-    // Najdeme interval kdekoliv v bloku
-    for (final l in block) {
-      final m = intervalRegex.firstMatch(l);
-      if (m != null) {
-        interval = int.parse(m.group(1)!);
-        break;
-      }
-    }
+    final interval = detectInterval(block);
 
     for (final l in block) {
-      // Smažeme řádek s intervalem
-      if (intervalRegex.hasMatch(l)) continue;
+      // Smazat řádky patřící k intervalu
+      if (isIntervalLine(l)) continue;
 
       if (interval != null) {
         final times = timeRegex.allMatches(l).toList();
