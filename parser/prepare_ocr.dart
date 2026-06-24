@@ -20,8 +20,6 @@ Future<void> main(List<String> args) async {
 
   // Přesné fráze, které mají být odstraněny
   final bannedPhrases = [
-    "DH - NM",
-    "NM - DH",
     "Depo Hostivař – Nemocnice Motol",
     "Nemocnice Motol – Depo Hostivař",
     "Depo Hostivař - Nemocnice Motol",
@@ -34,6 +32,13 @@ Future<void> main(List<String> args) async {
     "Strana",
     "Pracovní den",
     "jede v pracovních dnech",
+    "Sokolovská 42/217",
+    "A",
+    "sobota",
+    "neděle",
+    "jede v",
+    "Nemocnice Motol - Petřiny - Skalka - Depo Hostivař",
+    "jízdní řád",
   ];
 
   final cleaned = <String>[];
