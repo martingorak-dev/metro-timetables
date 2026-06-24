@@ -46,6 +46,13 @@ Future<void> main(List<String> args) async {
     final lower = lineText.toLowerCase();
 
     bool skip = false;
+
+    // 1) Smazat řádek, který obsahuje JEN "A"
+    if (lineText.trim() == "A") {
+      skip = true;
+    }
+
+    // 2) Zakázané fráze
     for (final phrase in bannedPhrases) {
       if (lower.contains(phrase.toLowerCase())) {
         skip = true;
