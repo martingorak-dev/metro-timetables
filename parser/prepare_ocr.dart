@@ -32,7 +32,6 @@ String replaceSpacesWithDashes(String line) {
   final matches = timeRegex.allMatches(line).toList();
 
   if (matches.isEmpty) {
-    // řádek bez časů → nahradíme všechny mezery
     return line.replaceAll(' ', '-');
   }
 
@@ -61,17 +60,24 @@ String restoreLeadingSpaces(String line) {
   final chars = line.split('');
   int i = 0;
 
-  // najdeme první nepomlčkový znak
   while (i < chars.length && chars[i] == '-') {
     i++;
   }
 
-  // nahradíme pomlčky před názvem stanice zpět mezerami
   for (int j = 0; j < i; j++) {
     chars[j] = ' ';
   }
 
   return chars.join('');
+}
+
+// 3) Odstranění slov „int.“ a „min.“ (ne celého řádku!)
+String removeIntervalWords(String line) {
+  return line
+      .replaceAll("int.", "")
+      .replaceAll("min.", "")
+      .replaceAll("INT.", "")
+      .replaceAll("MIN.", "");
 }
 
 Future<void> main(List<String> args) async {
@@ -122,7 +128,6 @@ Future<void> main(List<String> args) async {
 
     bool skip = false;
 
-    // Smazat řádek, který obsahuje JEN "A"
     if (lineText.trim() == "A") skip = true;
 
     for (final phrase in bannedPhrases) {
@@ -148,14 +153,15 @@ Future<void> main(List<String> args) async {
   }
   if (current.isNotEmpty) blocks.add(current);
 
-  // 3) Nahrazení mezer pomlčkami + vrácení pomlček před názvem na mezery
+  // 3) Nahrazení mezer pomlčkami + vrácení pomlček před názvem na mezery + odstranění "int." a "min."
   final output = <String>[];
 
   for (final block in blocks) {
     for (final l in block) {
       final dashed = replaceSpacesWithDashes(l);
       final restored = restoreLeadingSpaces(dashed);
-      output.add(restored);
+      final cleaned = removeIntervalWords(restored);
+      output.add(cleaned);
     }
   }
 
