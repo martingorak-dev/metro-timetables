@@ -37,7 +37,8 @@ Future<void> main(List<String> args) async {
     "neděle",
     "jede v",
     "jízdní řád",
-    "nemocnice motol -"
+    "nemocnice motol -",
+    " a ",
   ];
 
   final cleaned = <String>[];
