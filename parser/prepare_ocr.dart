@@ -37,7 +37,6 @@ Future<void> main(List<String> args) async {
     "sobota",
     "neděle",
     "jede v",
-    "Nemocnice Motol - Petřiny - Skalka - Depo Hostivař",
     "jízdní řád",
   ];
 
