@@ -56,15 +56,6 @@ String replaceSpacesWithDashes(String line) {
   return chars.join('');
 }
 
-// Funkce pro odstranění počátečních pomlček
-String removeLeadingDashes(String line) {
-  int i = 0;
-  while (i < line.length && line[i] == '-') {
-    i++;
-  }
-  return line.substring(i);
-}
-
 Future<void> main(List<String> args) async {
   if (args.isEmpty) {
     print("Použití: dart run parser/prepare_ocr.dart A");
@@ -103,7 +94,6 @@ Future<void> main(List<String> args) async {
     "jede v",
     "jízdní řád",
     "nemocnice motol -",
-    "soft.",
   ];
 
   final filtered = <String>[];
@@ -140,14 +130,13 @@ Future<void> main(List<String> args) async {
   }
   if (current.isNotEmpty) blocks.add(current);
 
-  // 3) Nahrazení mezer pomlčkami + zarovnání doleva
+  // 3) Nahrazení mezer pomlčkami (bez zarovnání doleva)
   final output = <String>[];
 
   for (final block in blocks) {
     for (final l in block) {
       final dashed = replaceSpacesWithDashes(l);
-      final aligned = removeLeadingDashes(dashed);
-      output.add(aligned);
+      output.add(dashed);
     }
   }
 
