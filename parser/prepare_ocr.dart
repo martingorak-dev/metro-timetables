@@ -1,6 +1,6 @@
 import 'dart:io';
 
-// Normalizace textu pro porovnávání
+// Normalizace textu
 String norm(String s) =>
     s.toLowerCase().replaceAll(RegExp(r'\s+'), ' ').trim();
 
@@ -73,7 +73,7 @@ Future<void> main(List<String> args) async {
   for (final line in lines) {
     final n = norm(line);
 
-    // Začátek TAM bloku
+    // Začátek TAM
     if (n.contains(norm(stations.first))) {
       if (current.isNotEmpty) {
         if (inTam) tamBlocks.add(current);
@@ -84,7 +84,7 @@ Future<void> main(List<String> args) async {
       inZpet = false;
     }
 
-    // Začátek ZPĚT bloku
+    // Začátek ZPĚT
     if (n.contains(norm(stations.last))) {
       if (current.isNotEmpty) {
         if (inTam) tamBlocks.add(current);
@@ -97,14 +97,14 @@ Future<void> main(List<String> args) async {
 
     current.add(line);
 
-    // Konec TAM bloku
+    // Konec TAM
     if (inTam && n.contains(norm(stations.last))) {
       tamBlocks.add(current);
       current = [];
       inTam = false;
     }
 
-    // Konec ZPĚT bloku
+    // Konec ZPĚT
     if (inZpet && n.contains(norm(stations.first))) {
       zpetBlocks.add(current);
       current = [];
@@ -113,30 +113,56 @@ Future<void> main(List<String> args) async {
   }
 
   // -------------------------------
-  // 2) Zpracujeme bloky → stanice → časy
+  // 2) Zpracování bloků → sloupce
   // -------------------------------
   Map<String, List<String>> tam = {for (var s in stations) s: []};
   Map<String, List<String>> zpet = {for (var s in stations.reversed) s: []};
+
+  // Extrakce sloupců podle pozice
+  List<String> extractColumns(String line) {
+    final matches = timeRegex.allMatches(line).toList();
+    if (matches.isEmpty) return [];
+
+    List<String> cols = [];
+    int lastEnd = 0;
+
+    for (final m in matches) {
+      final start = m.start;
+
+      // Pokud je mezi časy velká mezera → prázdný sloupec
+      if (start - lastEnd > 6) {
+        cols.add("-----");
+      }
+
+      cols.add(m.group(0)!);
+      lastEnd = m.end;
+    }
+
+    return cols;
+  }
 
   void processBlocks(List<List<String>> blocks, Map<String, List<String>> target) {
     for (final block in blocks) {
       for (final st in target.keys) {
         final stNorm = norm(st);
 
-        // Najdeme řádky patřící ke stanici
+        // Najdeme řádky stanice
         final stationLines = block.where((l) => norm(l).contains(stNorm)).toList();
 
-        // Extrahujeme časy
-        for (final l in stationLines) {
-          final times = timeRegex.allMatches(l).map((m) => m.group(0)!).toList();
-          target[st]!.addAll(times);
+        if (stationLines.isEmpty) continue;
 
-          // Intervaly
+        // Sloupce z prvního řádku
+        final cols = extractColumns(stationLines.first);
+
+        // Intervaly
+        for (final l in stationLines) {
           if (isIntervalLine(l)) {
             final x = extractInterval(l);
-            if (x != null) target[st]!.add("INT $x");
+            if (x != null) cols.add("INT $x");
           }
         }
+
+        target[st]!.addAll(cols);
       }
     }
   }
@@ -147,31 +173,29 @@ Future<void> main(List<String> args) async {
   // -------------------------------
   // 3) Zarovnání sloupců
   // -------------------------------
-  const timeWidth = 5; // např. "4:43 "
+  const timeWidth = 5; // "hh:mm" nebo "-----"
   const intWidth = 6;  // "INT 10"
 
-  String padTime(String t) {
-    if (t.startsWith("INT")) {
-      return t.padRight(intWidth);
-    }
+  String pad(String t) {
+    if (t.startsWith("INT")) return t.padRight(intWidth);
     return t.padRight(timeWidth);
   }
 
   // -------------------------------
-  // 4) Uložíme výsledek
+  // 4) Výstup
   // -------------------------------
   final out = StringBuffer();
 
   out.writeln("[TAM]");
   for (final st in stations) {
-    final padded = tam[st]!.map(padTime).join("    "); // 4 mezery
+    final padded = tam[st]!.map(pad).join("    ");
     out.writeln("${st.padRight(20)} | $padded");
   }
 
   out.writeln("");
   out.writeln("[ZPET]");
   for (final st in stations.reversed) {
-    final padded = zpet[st]!.map(padTime).join("    ");
+    final padded = zpet[st]!.map(pad).join("    ");
     out.writeln("${st.padRight(20)} | $padded");
   }
 
