@@ -3,6 +3,31 @@ import 'dart:io';
 final timeRegex = RegExp(r'\b\d{1,2}:\d{2}\b');
 final intervalRegex = RegExp(r'int\.\s*(\d+)\s*min', caseSensitive: false);
 
+// Stanice linky A
+final stations = [
+  "DEPO HOSTIVAŘ",
+  "Skalka",
+  "Strašnická",
+  "Želivského",
+  "Jiřího z Poděbrad",
+  "Náměstí Míru",
+  "Muzeum",
+  "Můstek",
+  "Staroměstská",
+  "Malostranská",
+  "Hradčanská",
+  "Dejvická",
+  "Bořislavka",
+  "Nádraží Veleslavín",
+  "Petřiny",
+  "NEMOCNICE MOTOL"
+];
+
+bool isStationLine(String line) {
+  final lower = line.toLowerCase();
+  return stations.any((s) => lower.contains(s.toLowerCase()));
+}
+
 Future<void> main(List<String> args) async {
   if (args.isEmpty) {
     print("Použití: dart run parser/prepare_ocr.dart A");
@@ -43,20 +68,16 @@ Future<void> main(List<String> args) async {
     "nemocnice motol -",
   ];
 
-  final cleaned = <String>[];
+  final filtered = <String>[];
 
-  // 1) Nejprve filtrujeme balast
+  // 1) Filtr balastu
   for (final lineText in lines) {
     final lower = lineText.toLowerCase();
 
     bool skip = false;
 
-    // Smazat řádek, který obsahuje JEN "A"
-    if (lineText.trim() == "A") {
-      skip = true;
-    }
+    if (lineText.trim() == "A") skip = true;
 
-    // Zakázané fráze
     for (final phrase in bannedPhrases) {
       if (lower.contains(phrase.toLowerCase())) {
         skip = true;
@@ -64,19 +85,30 @@ Future<void> main(List<String> args) async {
       }
     }
 
-    if (!skip) cleaned.add(lineText);
+    if (!skip) filtered.add(lineText);
   }
 
-  // 2) Teď zpracujeme intervaly po blocích
+  // 2) Rozdělení na bloky podle výskytu stanic
+  final blocks = <List<String>>[];
+  List<String> current = [];
+
+  for (final l in filtered) {
+    if (isStationLine(l) && current.isNotEmpty) {
+      blocks.add(current);
+      current = [];
+    }
+    current.add(l);
+  }
+  if (current.isNotEmpty) blocks.add(current);
+
+  // 3) Zpracování intervalů v blocích
   final output = <String>[];
-  List<String> currentBlock = [];
 
-  void flushBlock() {
-    if (currentBlock.isEmpty) return;
-
-    // Najdeme interval
+  for (final block in blocks) {
     int? interval;
-    for (final l in currentBlock) {
+
+    // Najdeme interval kdekoliv v bloku
+    for (final l in block) {
       final m = intervalRegex.firstMatch(l);
       if (m != null) {
         interval = int.parse(m.group(1)!);
@@ -84,52 +116,28 @@ Future<void> main(List<String> args) async {
       }
     }
 
-    // Pokud není interval → jen přidáme blok
-    if (interval == null) {
-      output.addAll(currentBlock);
-      currentBlock.clear();
-      return;
-    }
-
-    // Jinak doplníme INT X mezi časové sloupce
-    final newBlock = <String>[];
-
-    for (final l in currentBlock) {
-      // Přeskočíme samotný řádek s "int. X min."
+    for (final l in block) {
+      // Smažeme řádek s intervalem
       if (intervalRegex.hasMatch(l)) continue;
 
-      final times = timeRegex.allMatches(l).toList();
+      if (interval != null) {
+        final times = timeRegex.allMatches(l).toList();
 
-      if (times.length < 2) {
-        newBlock.add(l);
-        continue;
+        if (times.length >= 2) {
+          final firstEnd = times[0].end;
+          final secondStart = times[1].start;
+
+          final before = l.substring(0, firstEnd);
+          final after = l.substring(secondStart);
+
+          output.add("$before   INT $interval   $after");
+          continue;
+        }
       }
 
-      // Najdeme pozici mezery mezi dvěma časy
-      final firstEnd = times[0].end;
-      final secondStart = times[1].start;
-
-      final before = l.substring(0, firstEnd);
-      final after = l.substring(secondStart);
-
-      final newLine = "$before   INT $interval   $after";
-      newBlock.add(newLine);
-    }
-
-    output.addAll(newBlock);
-    currentBlock.clear();
-  }
-
-  // Rozdělení na bloky podle prázdných řádků
-  for (final l in cleaned) {
-    if (l.trim().isEmpty) {
-      flushBlock();
-      output.add("");
-    } else {
-      currentBlock.add(l);
+      output.add(l);
     }
   }
-  flushBlock();
 
   Directory("ocr_priprava").createSync(recursive: true);
   File(outputPath).writeAsStringSync(output.join("\n"));
