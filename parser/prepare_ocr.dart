@@ -27,7 +27,7 @@ bool isStationLine(String line) {
   return stations.any((s) => lower.contains(s.toLowerCase()));
 }
 
-// Funkce pro nahrazení mezer pomlčkami mezi časy
+// 1) Nahrazení mezer pomlčkami (jen tam, kde chceme)
 String replaceSpacesWithDashes(String line) {
   final matches = timeRegex.allMatches(line).toList();
 
@@ -38,12 +38,12 @@ String replaceSpacesWithDashes(String line) {
 
   final chars = line.split('');
 
-  // 1) Od začátku řádku po první čas
+  // Od začátku řádku po první čas
   for (int i = 0; i < matches.first.start; i++) {
     if (chars[i] == ' ') chars[i] = '-';
   }
 
-  // 2) Mezi jednotlivými časy
+  // Mezi jednotlivými časy
   for (int i = 0; i < matches.length - 1; i++) {
     final endOfThis = matches[i].end;
     final startOfNext = matches[i + 1].start;
@@ -51,6 +51,24 @@ String replaceSpacesWithDashes(String line) {
     for (int j = endOfThis; j < startOfNext; j++) {
       if (chars[j] == ' ') chars[j] = '-';
     }
+  }
+
+  return chars.join('');
+}
+
+// 2) Pomlčky před názvem stanice → zpět na mezery
+String restoreLeadingSpaces(String line) {
+  final chars = line.split('');
+  int i = 0;
+
+  // najdeme první nepomlčkový znak
+  while (i < chars.length && chars[i] == '-') {
+    i++;
+  }
+
+  // nahradíme pomlčky před názvem stanice zpět mezerami
+  for (int j = 0; j < i; j++) {
+    chars[j] = ' ';
   }
 
   return chars.join('');
@@ -130,13 +148,14 @@ Future<void> main(List<String> args) async {
   }
   if (current.isNotEmpty) blocks.add(current);
 
-  // 3) Nahrazení mezer pomlčkami (bez zarovnání doleva)
+  // 3) Nahrazení mezer pomlčkami + vrácení pomlček před názvem na mezery
   final output = <String>[];
 
   for (final block in blocks) {
     for (final l in block) {
       final dashed = replaceSpacesWithDashes(l);
-      output.add(dashed);
+      final restored = restoreLeadingSpaces(dashed);
+      output.add(restored);
     }
   }
 
