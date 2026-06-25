@@ -42,3 +42,5 @@ parser/*
 !parser/*.dart
 !parser/.gitkeep
 
+PID_GTFS/
+*.zip
