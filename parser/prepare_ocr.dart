@@ -27,6 +27,10 @@ bool isStationLine(String line) {
   return stations.any((s) => lower.contains(s.toLowerCase()));
 }
 
+bool containsTime(String line) {
+  return timeRegex.hasMatch(line);
+}
+
 // 1) Nahrazení mezer pomlčkami (jen tam, kde chceme)
 String replaceSpacesWithDashes(String line) {
   final matches = timeRegex.allMatches(line).toList();
@@ -78,6 +82,36 @@ String removeIntervalWords(String line) {
       .replaceAll("min.", "")
       .replaceAll("INT.", "")
       .replaceAll("MIN.", "");
+}
+
+// 4) Identifikace prázdných / odpadních řádků
+bool isGarbageLine(String line) {
+  final trimmed = line.replaceAll('-', '').trim();
+  return trimmed.isEmpty;
+}
+
+// 5) Spojení rozdělených řádků stanice (hlavní fix)
+List<String> mergeBrokenStationLines(List<String> block) {
+  final merged = <String>[];
+
+  for (int i = 0; i < block.length; i++) {
+    final line = block[i];
+
+    // Pokud je to stanice a další řádek obsahuje časy → spojit
+    if (isStationLine(line) &&
+        i + 1 < block.length &&
+        !isStationLine(block[i + 1]) &&
+        containsTime(block[i + 1])) {
+
+      final combined = line.trimRight() + "---" + block[i + 1].trimLeft();
+      merged.add(combined);
+      i++; // přeskočit další řádek
+    } else {
+      merged.add(line);
+    }
+  }
+
+  return merged;
 }
 
 Future<void> main(List<String> args) async {
@@ -153,15 +187,21 @@ Future<void> main(List<String> args) async {
   }
   if (current.isNotEmpty) blocks.add(current);
 
-  // 3) Nahrazení mezer pomlčkami + vrácení pomlček před názvem na mezery + odstranění "int." a "min."
+  // 3) Zpracování bloků
   final output = <String>[];
 
   for (final block in blocks) {
-    for (final l in block) {
+    // nejdřív spojíme rozdělené řádky
+    final mergedBlock = mergeBrokenStationLines(block);
+
+    for (final l in mergedBlock) {
       final dashed = replaceSpacesWithDashes(l);
       final restored = restoreLeadingSpaces(dashed);
       final cleaned = removeIntervalWords(restored);
-      output.add(cleaned);
+
+      if (!isGarbageLine(cleaned)) {
+        output.add(cleaned);
+      }
     }
   }
 
