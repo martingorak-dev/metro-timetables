@@ -4,7 +4,6 @@ on:
   push:
     paths:
       - "pdf/*.pdf"
-      - "parser/**"
       - ".github/workflows/parse.yml"
 
 jobs:
@@ -15,47 +14,68 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Install Poppler (pdftotext)
+      - name: Install dependencies for Camelot
         run: |
           sudo apt-get update
-          sudo apt-get install -y poppler-utils
+          sudo apt-get install -y python3 python3-pip ghostscript python3-tk libglib2.0-0 libsm6 libxrender1 libxext6
+          pip install camelot-py[cv] openpyxl
 
-      - name: Convert PDFs to text (always)
+      - name: Convert PDF to Excel (A, B, C)
         run: |
-          mkdir -p ocr
-          mkdir -p ocr_new
+          mkdir -p excel
           for f in pdf/*.pdf; do
             base=$(basename "$f")
             prefix=${base:0:1}
             upper=$(echo "$prefix" | tr '[:lower:]' '[:upper:]')
 
             if [ "$upper" = "A" ] || [ "$upper" = "B" ] || [ "$upper" = "C" ]; then
-              echo "Converting $f → ocr_new/$upper.txt"
-              pdftotext -layout "$f" "ocr_new/$upper.txt"
-            fi
-          done
+              echo "Converting $f → excel/$upper.xlsx"
 
-      - name: Install Dart SDK
-        uses: dart-lang/setup-dart@v1
+              python3 - << 'EOF'
+  import camelot
+  import sys
+  
+  pdf = sys.argv[1]
+  xlsx = sys.argv[2]
+  
+  print("Reading PDF:", pdf)
+  tables = camelot.read_pdf(pdf, pages="all")
+  
+  print("Exporting to:", xlsx)
+  tables.export(xlsx, f="excel")
+  EOF
+  python3 - "$f" "excel/$upper.xlsx"
+  fi
+  done
 
-      - name: Always update TXT and run parser
-        run: |
-          mkdir -p ocr
-          for line in A B C; do
-            if [ -f "ocr_new/$line.txt" ]; then
-              echo "Updating TXT for $line"
-              cp --no-preserve=mode,ownership,timestamps "ocr_new/$line.txt" "ocr/$line.txt"
-              echo "Running parser for $line"
-              dart run parser/parser.dart $line
-            else
-              echo "Skipping $line – no TXT file"
-            fi
-          done
+# OCR + parser zakomentováno
+#
+# - name: Install Poppler (pdftotext)
+#   run: sudo apt-get install -y poppler-utils
+#
+# - name: Convert PDFs to text
+#   run: |
+#     mkdir -p ocr_new
+#     for f in pdf/*.pdf; do
+#       base=$(basename "$f")
+#       prefix=${base:0:1}
+#       upper=$(echo "$prefix" | tr '[:lower:]' '[:upper:]')
+#       pdftotext -layout "$f" "ocr_new/$upper.txt"
+#     done
+#
+# - name: Install Dart SDK
+#   uses: dart-lang/setup-dart@v1
+#
+# - name: Run parser
+#   run: |
+#     for line in A B C; do
+#       dart run parser/parser.dart $line
+#     done
 
-      - name: Commit results
-        run: |
-          git config --global user.name "github-actions"
-          git config --global user.email "actions@github.com"
-          git add json/ ocr/ ocr_new/
-          git commit -m "Update parsed timetables" || echo "No changes to commit"
-          git push
+- name: Commit results
+  run: |
+    git config --global user.name "github-actions"
+    git config --global user.email "actions@github.com"
+    git add excel/
+    git commit -m "Update Excel timetables" || echo "No changes to commit"
+    git push
