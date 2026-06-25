@@ -2,9 +2,8 @@ import 'dart:io';
 
 void main() async {
   final buffer = StringBuffer();
-  buffer.writeln("=== METRO A – SEŘAZENÉ ČASY (TEST) ===");
+  buffer.writeln("=== METRO A – TAM/ZPĚT (TEST) ===");
 
-  // Load GTFS files
   final trips = _loadCsv("PID_GTFS/trips.txt");
   final stopTimes = _loadCsv("PID_GTFS/stop_times.txt");
   final stops = _loadCsv("PID_GTFS/stops.txt");
@@ -13,62 +12,89 @@ void main() async {
 
   const routeIdA = "L991";
 
-  buffer.writeln("Route A = $routeIdA");
-
   final tripsA = trips.where((t) => t["route_id"] == routeIdA).toList();
-  buffer.writeln("Trips found: ${tripsA.length}");
 
+  // Výstupní struktura
   final result = {
-    "weekday": <String, List<String>>{},
-    "saturday": <String, List<String>>{},
-    "sunday": <String, List<String>>{},
+    "weekday": {
+      "TAM": <String, List<String>>{},
+      "ZPET": <String, List<String>>{},
+    },
+    "saturday": {
+      "TAM": <String, List<String>>{},
+      "ZPET": <String, List<String>>{},
+    },
+    "sunday": {
+      "TAM": <String, List<String>>{},
+      "ZPET": <String, List<String>>{},
+    },
   };
 
   for (var trip in tripsA) {
     final tripId = trip["trip_id"]!;
     final serviceId = trip["service_id"]!;
+    final direction = trip["direction_id"]!;
 
     final dayType = _resolveDayType(serviceId, calendar, calendarDates);
     if (dayType == null) continue;
 
-    final times = stopTimes.where((st) => st["trip_id"] == tripId);
+    final times = stopTimes.where((st) => st["trip_id"] == tripId).toList();
+    if (times.isEmpty) continue;
 
+    // První zastávka tripu
+    final firstStop = times.first["stop_id"]!;
+    final firstStopName = stops
+        .firstWhere((s) => s["stop_id"] == firstStop)["stop_name"]!;
+
+    // Filtrace podle směru
+    if (direction == "0" && firstStopName != "Depo Hostivař") continue;
+    if (direction == "1" && firstStopName != "Nemocnice Motol") continue;
+
+    final dirKey = direction == "0" ? "TAM" : "ZPET";
+
+    // Přiřazení časů ke stanicím
     for (var st in times) {
       final stopId = st["stop_id"]!;
       final departure = st["departure_time"]!;
 
-      final stopName = stops.firstWhere(
-            (s) => s["stop_id"] == stopId,
-        orElse: () => {"stop_name": "UNKNOWN"},
-      )["stop_name"]!;
+      final stopName = stops
+          .firstWhere((s) => s["stop_id"] == stopId)["stop_name"]!;
 
-      result[dayType]!.putIfAbsent(stopName, () => []);
-      result[dayType]![stopName]!.add(departure);
+      result[dayType]![dirKey]!.putIfAbsent(stopName, () => []);
+      result[dayType]![dirKey]![stopName]!.add(departure);
     }
   }
 
-  // SORT TIMES
+  // Seřadit časy
   for (var day in result.keys) {
-    for (var stop in result[day]!.keys) {
-      result[day]![stop]!.sort((a, b) =>
-          _timeToSeconds(a).compareTo(_timeToSeconds(b)));
+    for (var dir in ["TAM", "ZPET"]) {
+      for (var stop in result[day]![dir]!.keys) {
+        result[day]![dir]![stop]!.sort(
+              (a, b) => _timeToSeconds(a).compareTo(_timeToSeconds(b)),
+        );
+      }
     }
   }
 
-  // Write output
+  // Výstup
   for (var day in ["weekday", "saturday", "sunday"]) {
     buffer.writeln("\n=== $day ===");
-    final stations = result[day]!;
-    for (var entry in stations.entries) {
-      final stopName = entry.key;
-      final times = entry.value;
 
-      buffer.writeln("\n$stopName:");
+    for (var dir in ["TAM", "ZPET"]) {
+      buffer.writeln("\n--- $dir ---");
 
-      if (stopName == "Depo Hostivař") {
-        buffer.writeln(times.join(", "));
-      } else {
-        buffer.writeln(times.take(20).join(", "));
+      final stations = result[day]![dir]!;
+      for (var entry in stations.entries) {
+        final stopName = entry.key;
+        final times = entry.value;
+
+        buffer.writeln("\n$stopName:");
+
+        if (stopName == "Depo Hostivař" || stopName == "Nemocnice Motol") {
+          buffer.writeln(times.join(", "));
+        } else {
+          buffer.writeln(times.take(20).join(", "));
+        }
       }
     }
   }
@@ -77,10 +103,9 @@ void main() async {
   print("Done.");
 }
 
-// Convert HH:MM:SS to seconds (handles 24+ hours)
 int _timeToSeconds(String t) {
-  final parts = t.split(":").map(int.parse).toList();
-  return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  final p = t.split(":").map(int.parse).toList();
+  return p[0] * 3600 + p[1] * 60 + p[2];
 }
 
 String? _resolveDayType(
@@ -119,15 +144,15 @@ List<String> _safeSplit(String line) {
   var inQuotes = false;
 
   for (var rune in line.runes) {
-    var char = String.fromCharCode(rune);
+    var c = String.fromCharCode(rune);
 
-    if (char == '"') {
+    if (c == '"') {
       inQuotes = !inQuotes;
-    } else if (char == ',' && !inQuotes) {
+    } else if (c == ',' && !inQuotes) {
       result.add(current.toString());
       current = StringBuffer();
     } else {
-      current.write(char);
+      current.write(c);
     }
   }
 
