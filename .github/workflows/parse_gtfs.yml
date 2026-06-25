@@ -1,0 +1,39 @@
+name: Parse GTFS
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  parse:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Install Dart SDK
+        uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - name: Download GTFS feed
+        run: |
+          curl -L -o PID_GTFS.zip https://data.pid.cz/PID_GTFS.zip
+          unzip PID_GTFS.zip -d PID_GTFS
+
+      - name: Run GTFS parser
+        run: dart parser/gtfs_parser.dart
+
+      - name: Commit debug_output.txt
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add debug_output.txt
+          git commit -m "Update debug_output.txt" || echo "No changes to commit"
+
+      - name: Push results
+        run: |
+          git push
