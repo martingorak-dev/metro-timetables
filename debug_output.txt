@@ -1,0 +1,33 @@
+=== GTFS PARSER DEBUG OUTPUT ===
+PID_GTFS folder found.
+
+Files in PID_GTFS:
+ - PID_GTFS/vehicle_boardings.txt (5407 bytes)
+ - PID_GTFS/pathways.txt (67193 bytes)
+ - PID_GTFS/route_sub_agencies.txt (46212 bytes)
+ - PID_GTFS/vehicle_allocations.txt (79 bytes)
+ - PID_GTFS/trips.txt (7681610 bytes)
+ - PID_GTFS/shapes.txt (158889452 bytes)
+ - PID_GTFS/agency.txt (189 bytes)
+ - PID_GTFS/calendar_dates.txt (380468 bytes)
+ - PID_GTFS/transfers.txt (779605 bytes)
+ - PID_GTFS/fare_attributes.txt (509 bytes)
+ - PID_GTFS/route_stops.txt (703688 bytes)
+ - PID_GTFS/stop_times.txt (143849260 bytes)
+ - PID_GTFS/stops.txt (1378665 bytes)
+ - PID_GTFS/feed_info.txt (164 bytes)
+ - PID_GTFS/calendar.txt (39224 bytes)
+ - PID_GTFS/routes.txt (91611 bytes)
+ - PID_GTFS/vehicle_categories.txt (66 bytes)
+ - PID_GTFS/fare_rules.txt (604 bytes)
+ - PID_GTFS/vehicle_couplings.txt (185 bytes)
+ - PID_GTFS/levels.txt (4006 bytes)
+
+routes.txt exists, reading first 5 lines:
+route_id,agency_id,route_short_name,route_long_name,route_type,route_url,route_color,route_text_color,is_night,is_regional,is_substitute_transport
+L991,99,A,"Nemocnice Motol - Petřiny - Skalka - Depo Hostivař",1,"https://pid.cz/linka/A",00A562,FFFFFF,0,0,0
+L992,99,B,"Zličín - Černý Most",1,"https://pid.cz/linka/B",F8B322,000000,0,0,0
+L993,99,C,"Letňany - Ládví - Háje",1,"https://pid.cz/linka/C",CF003D,FFFFFF,0,0,0
+L1,99,1,"Sídliště Petřiny - Výstaviště",0,"https://pid.cz/linka/1",7A0603,FFFFFF,0,0,0
+
+=== END ===
