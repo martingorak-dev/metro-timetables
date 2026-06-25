@@ -2,7 +2,7 @@ import 'dart:io';
 
 void main() async {
   final buffer = StringBuffer();
-  buffer.writeln("=== METRO A – ČASY (TEST) ===");
+  buffer.writeln("=== METRO A – SEŘAZENÉ ČASY (TEST) ===");
 
   // Load GTFS files
   final trips = _loadCsv("PID_GTFS/trips.txt");
@@ -47,6 +47,14 @@ void main() async {
     }
   }
 
+  // SORT TIMES
+  for (var day in result.keys) {
+    for (var stop in result[day]!.keys) {
+      result[day]![stop]!.sort((a, b) =>
+          _timeToSeconds(a).compareTo(_timeToSeconds(b)));
+    }
+  }
+
   // Write output
   for (var day in ["weekday", "saturday", "sunday"]) {
     buffer.writeln("\n=== $day ===");
@@ -58,18 +66,21 @@ void main() async {
       buffer.writeln("\n$stopName:");
 
       if (stopName == "Depo Hostivař") {
-        // vypiš všechny časy
         buffer.writeln(times.join(", "));
       } else {
-        // vypiš jen prvních 20
-        final preview = times.take(20).join(", ");
-        buffer.writeln(preview);
+        buffer.writeln(times.take(20).join(", "));
       }
     }
   }
 
   await File("debug_output.txt").writeAsString(buffer.toString());
   print("Done.");
+}
+
+// Convert HH:MM:SS to seconds (handles 24+ hours)
+int _timeToSeconds(String t) {
+  final parts = t.split(":").map(int.parse).toList();
+  return parts[0] * 3600 + parts[1] * 60 + parts[2];
 }
 
 String? _resolveDayType(
