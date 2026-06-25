@@ -2,7 +2,7 @@ import 'dart:io';
 
 void main() async {
   final buffer = StringBuffer();
-  buffer.writeln("=== METRO A – TAM/ZPĚT (TEST) ===");
+  buffer.writeln("=== METRO A – ČISTÉ ODJEZDY (TEST) ===");
 
   final trips = _loadCsv("PID_GTFS/trips.txt");
   final stopTimes = _loadCsv("PID_GTFS/stop_times.txt");
@@ -12,22 +12,18 @@ void main() async {
 
   const routeIdA = "L991";
 
+  // Depo Hostivař stop IDs
+  const depoStops = {"U953Z101P", "U953Z102P"};
+
+  // Nemocnice Motol stop IDs
+  const motolStops = {"U1071Z102P", "U1071Z101P"};
+
   final tripsA = trips.where((t) => t["route_id"] == routeIdA).toList();
 
-  // Výstupní struktura
   final result = {
-    "weekday": {
-      "TAM": <String, List<String>>{},
-      "ZPET": <String, List<String>>{},
-    },
-    "saturday": {
-      "TAM": <String, List<String>>{},
-      "ZPET": <String, List<String>>{},
-    },
-    "sunday": {
-      "TAM": <String, List<String>>{},
-      "ZPET": <String, List<String>>{},
-    },
+    "weekday": {"TAM": <String, List<String>>{}, "ZPET": <String, List<String>>{}},
+    "saturday": {"TAM": <String, List<String>>{}, "ZPET": <String, List<String>>{}},
+    "sunday": {"TAM": <String, List<String>>{}, "ZPET": <String, List<String>>{}},
   };
 
   for (var trip in tripsA) {
@@ -41,31 +37,36 @@ void main() async {
     final times = stopTimes.where((st) => st["trip_id"] == tripId).toList();
     if (times.isEmpty) continue;
 
-    // První zastávka tripu
-    final firstStop = times.first["stop_id"]!;
-    final firstStopName = stops
-        .firstWhere((s) => s["stop_id"] == firstStop)["stop_name"]!;
+    // první zastávka
+    final first = times.first;
+    final firstStopId = first["stop_id"]!;
 
-    // Filtrace podle směru
-    if (direction == "0" && firstStopName != "Depo Hostivař") continue;
-    if (direction == "1" && firstStopName != "Nemocnice Motol") continue;
+    String? dirKey;
 
-    final dirKey = direction == "0" ? "TAM" : "ZPET";
+    if (direction == "0" && depoStops.contains(firstStopId)) {
+      dirKey = "TAM";
+    } else if (direction == "1" && motolStops.contains(firstStopId)) {
+      dirKey = "ZPET";
+    } else {
+      continue; // zahodit technické / zkrácené / obraty
+    }
 
-    // Přiřazení časů ke stanicím
+    // přiřazení časů
     for (var st in times) {
       final stopId = st["stop_id"]!;
       final departure = st["departure_time"]!;
 
-      final stopName = stops
-          .firstWhere((s) => s["stop_id"] == stopId)["stop_name"]!;
+      final stopName = stops.firstWhere(
+            (s) => s["stop_id"] == stopId,
+        orElse: () => {"stop_name": "UNKNOWN"},
+      )["stop_name"]!;
 
       result[dayType]![dirKey]!.putIfAbsent(stopName, () => []);
       result[dayType]![dirKey]![stopName]!.add(departure);
     }
   }
 
-  // Seřadit časy
+  // seřadit
   for (var day in result.keys) {
     for (var dir in ["TAM", "ZPET"]) {
       for (var stop in result[day]![dir]!.keys) {
@@ -76,7 +77,7 @@ void main() async {
     }
   }
 
-  // Výstup
+  // výstup
   for (var day in ["weekday", "saturday", "sunday"]) {
     buffer.writeln("\n=== $day ===");
 
