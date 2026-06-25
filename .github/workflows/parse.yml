@@ -48,30 +48,6 @@ jobs:
   fi
   done
 
-# OCR + parser zakomentováno
-#
-# - name: Install Poppler (pdftotext)
-#   run: sudo apt-get install -y poppler-utils
-#
-# - name: Convert PDFs to text
-#   run: |
-#     mkdir -p ocr_new
-#     for f in pdf/*.pdf; do
-#       base=$(basename "$f")
-#       prefix=${base:0:1}
-#       upper=$(echo "$prefix" | tr '[:lower:]' '[:upper:]')
-#       pdftotext -layout "$f" "ocr_new/$upper.txt"
-#     done
-#
-# - name: Install Dart SDK
-#   uses: dart-lang/setup-dart@v1
-#
-# - name: Run parser
-#   run: |
-#     for line in A B C; do
-#       dart run parser/parser.dart $line
-#     done
-
 - name: Commit results
   run: |
     git config --global user.name "github-actions"
