@@ -1,33 +1,57 @@
-=== GTFS PARSER DEBUG OUTPUT ===
-PID_GTFS folder found.
+=== METRO A (TEST) ===
+Route A = L991
+Trips found: 1165
 
-Files in PID_GTFS:
- - PID_GTFS/vehicle_boardings.txt (5407 bytes)
- - PID_GTFS/pathways.txt (67193 bytes)
- - PID_GTFS/route_sub_agencies.txt (46212 bytes)
- - PID_GTFS/vehicle_allocations.txt (79 bytes)
- - PID_GTFS/trips.txt (7681610 bytes)
- - PID_GTFS/shapes.txt (158889452 bytes)
- - PID_GTFS/agency.txt (189 bytes)
- - PID_GTFS/calendar_dates.txt (380468 bytes)
- - PID_GTFS/transfers.txt (779605 bytes)
- - PID_GTFS/fare_attributes.txt (509 bytes)
- - PID_GTFS/route_stops.txt (703688 bytes)
- - PID_GTFS/stop_times.txt (143849260 bytes)
- - PID_GTFS/stops.txt (1378665 bytes)
- - PID_GTFS/feed_info.txt (164 bytes)
- - PID_GTFS/calendar.txt (39224 bytes)
- - PID_GTFS/routes.txt (91611 bytes)
- - PID_GTFS/vehicle_categories.txt (66 bytes)
- - PID_GTFS/fare_rules.txt (604 bytes)
- - PID_GTFS/vehicle_couplings.txt (185 bytes)
- - PID_GTFS/levels.txt (4006 bytes)
+=== weekday ===
+Skalka: 831 odjezdů
+Strašnická: 831 odjezdů
+Želivského: 831 odjezdů
+Jiřího z Poděbrad: 831 odjezdů
+Náměstí Míru: 831 odjezdů
+Muzeum: 831 odjezdů
+Můstek: 831 odjezdů
+Staroměstská: 831 odjezdů
+Malostranská: 831 odjezdů
+Hradčanská: 831 odjezdů
+Dejvická: 831 odjezdů
+Bořislavka: 830 odjezdů
+Nádraží Veleslavín: 830 odjezdů
+Petřiny: 830 odjezdů
+Nemocnice Motol: 828 odjezdů
+Depo Hostivař: 496 odjezdů
 
-routes.txt exists, reading first 5 lines:
-route_id,agency_id,route_short_name,route_long_name,route_type,route_url,route_color,route_text_color,is_night,is_regional,is_substitute_transport
-L991,99,A,"Nemocnice Motol - Petřiny - Skalka - Depo Hostivař",1,"https://pid.cz/linka/A",00A562,FFFFFF,0,0,0
-L992,99,B,"Zličín - Černý Most",1,"https://pid.cz/linka/B",F8B322,000000,0,0,0
-L993,99,C,"Letňany - Ládví - Háje",1,"https://pid.cz/linka/C",CF003D,FFFFFF,0,0,0
-L1,99,1,"Sídliště Petřiny - Výstaviště",0,"https://pid.cz/linka/1",7A0603,FFFFFF,0,0,0
+=== saturday ===
+Depo Hostivař: 221 odjezdů
+Skalka: 221 odjezdů
+Strašnická: 221 odjezdů
+Želivského: 221 odjezdů
+Jiřího z Poděbrad: 221 odjezdů
+Náměstí Míru: 221 odjezdů
+Muzeum: 221 odjezdů
+Můstek: 221 odjezdů
+Staroměstská: 221 odjezdů
+Malostranská: 221 odjezdů
+Hradčanská: 221 odjezdů
+Dejvická: 221 odjezdů
+Bořislavka: 221 odjezdů
+Nádraží Veleslavín: 221 odjezdů
+Petřiny: 221 odjezdů
+Nemocnice Motol: 221 odjezdů
 
-=== END ===
+=== sunday ===
+Depo Hostivař: 113 odjezdů
+Skalka: 113 odjezdů
+Strašnická: 113 odjezdů
+Želivského: 113 odjezdů
+Jiřího z Poděbrad: 113 odjezdů
+Náměstí Míru: 113 odjezdů
+Muzeum: 113 odjezdů
+Můstek: 113 odjezdů
+Staroměstská: 113 odjezdů
+Malostranská: 113 odjezdů
+Hradčanská: 113 odjezdů
+Dejvická: 113 odjezdů
+Bořislavka: 113 odjezdů
+Nádraží Veleslavín: 113 odjezdů
+Petřiny: 113 odjezdů
+Nemocnice Motol: 113 odjezdů
