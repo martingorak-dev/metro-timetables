@@ -5,6 +5,7 @@ on:
     paths:
       - "pdf/*.pdf"
       - ".github/workflows/parse.yml"
+      - "parser/pdf_to_excel.py"
 
 jobs:
   parse:
@@ -30,28 +31,14 @@ jobs:
 
             if [ "$upper" = "A" ] || [ "$upper" = "B" ] || [ "$upper" = "C" ]; then
               echo "Converting $f → excel/$upper.xlsx"
+              python3 parser/pdf_to_excel.py "$f" "excel/$upper.xlsx"
+            fi
+          done
 
-              python3 - << 'EOF'
-  import camelot
-  import sys
-  
-  pdf = sys.argv[1]
-  xlsx = sys.argv[2]
-  
-  print("Reading PDF:", pdf)
-  tables = camelot.read_pdf(pdf, pages="all")
-  
-  print("Exporting to:", xlsx)
-  tables.export(xlsx, f="excel")
-  EOF
-  python3 - "$f" "excel/$upper.xlsx"
-  fi
-  done
-
-- name: Commit results
-  run: |
-    git config --global user.name "github-actions"
-    git config --global user.email "actions@github.com"
-    git add excel/
-    git commit -m "Update Excel timetables" || echo "No changes to commit"
-    git push
+      - name: Commit results
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "actions@github.com"
+          git add excel/
+          git commit -m "Update Excel timetables" || echo "No changes to commit"
+          git push
